@@ -16,7 +16,7 @@ def index():
     if not os.path.exists(DB_FILE):
         return "<h3>Chua co khachhang.db tren cloud. Hay chay auto_sync.py o may ca nhan de day len.</h3>"
     conn = get_db()
-    rows = conn.execute("SELECT order_id, nickname, username FROM tonghopdon ORDER BY order_id DESC").fetchall()
+    rows = conn.execute("SELECT order_id, nickname, username FROM tonghopdon ORDER BY order_id DESC LIMIT 500").fetchall()
     conn.close()
     data = [(r["order_id"], r["nickname"], r["username"]) for r in rows]
     return render_template("donhang.html", data=data)
@@ -52,6 +52,10 @@ def sync_db(ten_db):
     tmp = ten_db + ".tmp"
     request.files['file'].save(tmp)
     os.replace(tmp, ten_db)
+    return "OK - da nhan %s %s bytes" % (ten_db, os.path.getsize(ten_db))
+
+@app.route("/health")
+def health():
     return "OK"
 
 if __name__ == "__main__":
