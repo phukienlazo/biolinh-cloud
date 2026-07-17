@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bảng điều khiển Quản trị viên</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+</head>
+<body class="bg-light">
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand fw-bold text-info" href="#"><i class="bi bi-shield-lock-fill"></i> Admin Portal</a>
+            <div class="d-flex text-white align-items-center">
+                <span class="me-3">Xin chào, <strong>{{ session.hovaten }}</strong> ({{ session.role }})</span>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">Đăng xuất</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container my-5">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <div class="row mb-4 align-items-center">
+            <div class="col-md-6">
+                <h2 class="fw-bold text-secondary">Danh Sách Nhân Viên</h2>
+            </div>
+            <div class="col-md-6 text-md-end">
+                <button class="btn btn-primary fw-semibold" data-bs-toggle="collapse" data-bs-target="#addEmployeeForm">
+                    <i class="bi bi-person-plus-fill"></i> Thêm Nhân Viên Mới
+                </button>
+            </div>
+        </div>
+
+        <!-- Khung Thêm Nhân Viên (Collapse) -->
+        <div class="collapse mb-4" id="addEmployeeForm">
+            <div class="card card-body shadow-sm">
+                <h5 class="card-title fw-bold text-primary mb-3">Tạo tài khoản nhân sự mới</h5>
+                <form action="{{ url_for('add_employee') }}" method="POST" class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Tên đăng nhập (Username)</label>
+                        <input type="text" name="username" class="form-control" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Mật khẩu</label>
+                        <input type="password" name="password" class="form-control" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Họ và Tên</label>
+                        <input type="text" name="hovaten" class="form-control" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Chức danh</label>
+                        <select name="chucdanh" class="form-select">
+                            <option value="Nhân Viên">Nhân Viên</option>
+                            <option value="QTV">Quản Trị Viên (QTV)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Lương 1 Tháng (26 công)</label>
+                        <input type="number" step="any" name="luong" class="form-control" placeholder="VNĐ" required>
+                    </div>
+                    <div class="col-12 text-end">
+                        <button type="submit" class="btn btn-success fw-semibold"><i class="bi bi-save"></i> Tạo tài khoản</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Bảng hiển thị danh sách nhân viên -->
+        <div class="card shadow-sm border-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Họ và Tên</th>
+                            <th>Username</th>
+                            <th>Lương Tháng (VNĐ)</th>
+                            <th>Tổng Công</th>
+                            <th>Thu Nhập Ước Tính</th>
+                            <th>Tổng Phát Sinh</th>
+                            <th>Thực Nhận</th>
+                            <th class="text-center">Hành Động</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if not employees %}
+                            <tr>
+                                <td colspan="8" class="text-center py-4 text-muted">Chưa có nhân sự nào trong hệ thống.</td>
+                            </tr>
+                        {% else %}
+                            {% for emp in employees %}
+                            <tr>
+                                <td><strong class="text-dark">{{ emp.hovaten }}</strong></td>
+                                <td><code>{{ emp.username }}</code></td>
+                                <td>{{ "{:,.0f}".format(emp.luong) }}</td>
+                                <td><span class="badge bg-info text-dark font-monospace fs-6">{{ emp.tong_cong }} công</span></td>
+                                <td>{{ "{:,.0f}".format(emp.thu_nhap_uoc_tinh) }}</td>
+                                <td class="{{ 'text-success' if emp.tong_phat_sinh >= 0 else 'text-danger' }} fw-bold">
+                                    {{ "{:+,.0f}".format(emp.tong_phat_sinh) }}
+                                </td>
+                                <td><span class="text-primary fw-bold fs-5">{{ "{:,.0f}".format(emp.thuc_nhan) }}</span></td>
+                                <td class="text-center">
+                                    <div class="btn-group">
+                                        <a href="{{ url_for('attendance_log', emp_id=emp.id) }}" class="btn btn-sm btn-outline-dark" title="QL Chấm công">
+                                            <i class="bi bi-calendar-check"></i> Chấm công
+                                        </a>
+                                        <a href="{{ url_for('edit_employee', emp_id=emp.id) }}" class="btn btn-sm btn-outline-primary" title="Sửa thông tin">
+                                            <i class="bi bi-pencil-square"></i> Quản lý NV
+                                        </a>
+                                        <a href="{{ url_for('delete_employee', emp_id=emp.id) }}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Bạn có chắc chắn muốn xóa nhân viên này khỏi hệ thống?')" title="Xóa nhân viên">
+                                            <i class="bi bi-trash"></i> Xóa
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
