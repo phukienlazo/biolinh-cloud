@@ -2,7 +2,10 @@
 import os
 import sqlite3
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
+
+VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
 app = Flask(__name__)
 app.secret_key = 'super_secret_key_attendance_system'
@@ -327,7 +330,7 @@ def pay_salary(emp_id):
     if not emp:
         return "Nhân viên không tồn tại", 404
     details = calculate_salary_details(emp, conn)
-    today = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    today = datetime.now(VN_TZ).strftime('%Y-%m-%d %H:%M:%S')
     cur.execute('INSERT INTO payment_history (employee_id, payment_date, luong_co_ban, tong_cong, thu_nhap_tinh, tong_phat_sinh, thuc_nhan) VALUES (?, ?, ?, ?, ?, ?, ?)', (emp_id, today, details['luong'], details['tong_cong'], details['thu_nhap_uoc_tinh'], details['tong_phat_sinh'], details['thuc_nhan']))
     cur.execute("DELETE FROM attendance WHERE employee_id = ?", (emp_id,))
     cur.execute("DELETE FROM chi_tiet_phat_sinh WHERE employee_id = ?", (emp_id,))
@@ -351,8 +354,9 @@ def employee_dashboard():
     cur.execute("SELECT * FROM attendance WHERE employee_id = ? ORDER BY date DESC, session DESC", (emp_id,))
     attendance_history = cur.fetchall()
     conn.close()
-    now = datetime.now()
+    now = datetime.now(VN_TZ)
     current_time = now.strftime('%H:%M')
+    today_str = now.strftime('%Y-%m-%d')
     sang_available = "07:30" <= current_time <= "11:30"
     chieu_available = "13:30" <= current_time <= "17:30"
     return render_template('employee_dashboard.html', emp=details, phat_sinh=phat_sinh, history=attendance_history, sang_available=sang_available, chieu_available=chieu_available)
@@ -363,7 +367,7 @@ def employee_checkin():
         return redirect(url_for('login'))
     emp_id = session['user_id']
     session_type = request.form['session_type']
-    now = datetime.now()
+    now = datetime.now(VN_TZ)
     current_time = now.strftime('%H:%M')
     today_str = now.strftime('%Y-%m-%d')
     if session_type == 'sang' and not ("07:30" <= current_time <= "11:30"):
