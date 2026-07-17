@@ -1,0 +1,11 @@
+
+<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lịch sử chấm công</title><style>body{font-family:system-ui;background:#f8fafc;padding:15px}
+.container{max-width:800px;margin:0 auto}.card{background:white;padding:15px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+table{width:100%;border-collapse:collapse} th,td{padding:10px;border-bottom:1px solid #e2e8f0;font-size:.85rem}
+</style></head><body><div class="container">
+<h2>Lịch sử chấm công {% if employee %} - {{employee.name}}{% endif %}</h2>
+<div class="card"><table><tr><th>Ngày</th><th>Check In</th><th>Check Out</th><th>Số giờ</th></tr>
+{% for r in logs %}<tr><td>{{r.date}}</td><td>{{r.check_in or '-'}}</td><td>{{r.check_out or '-'}}</td><td>{{r.work_hours or '-'}}</td></tr>{% endfor %}
+</table></div>
+<p><a href="/chamcong/admin">← Quay lại</a></p></div></body></html>

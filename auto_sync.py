@@ -7,7 +7,7 @@ from watchdog.events import FileSystemEventHandler
 CLOUD_URL = "https://ten-app-cua-ban.onrender.com"  # dán link Render vào đây
 TOKEN = "biolinh2hand_2026"
 
-FILES_TO_WATCH = ["khachhang.db"]
+FILES_TO_WATCH = ["khachhang.db", "chamcong.db"]
 
 class Handler(FileSystemEventHandler):
     def on_modified(self, event):

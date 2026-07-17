@@ -1,0 +1,20 @@
+
+<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quản lý nhân viên</title><style>body{font-family:system-ui;background:#f8fafc;padding:15px}
+.container{max-width:900px;margin:0 auto}.card{background:white;padding:15px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,.08);margin-bottom:15px;overflow:auto}
+table{width:100%;border-collapse:collapse} th,td{padding:10px;border-bottom:1px solid #e2e8f0;text-align:left;font-size:.9rem}
+.btn{padding:6px 12px;border-radius:8px;border:none;cursor:pointer;font-size:.8rem}.btn-add{background:#2563eb;color:white}
+</style></head><body><div class="container">
+<h2>Quản lý chấm công - Admin</h2>
+<div class="card">
+<form method="POST" action="/chamcong/add_employee" style="display:flex;gap:8px;flex-wrap:wrap">
+<input name="name" placeholder="Tên NV" required style="padding:8px;border-radius:8px;border:1px solid #ccc">
+<input name="username" placeholder="Username" required style="padding:8px;border-radius:8px;border:1px solid #ccc">
+<input name="password" placeholder="Mật khẩu" required style="padding:8px;border-radius:8px;border:1px solid #ccc">
+<button class="btn btn-add">+ Thêm NV</button></form></div>
+<div class="card"><table><tr><th>ID</th><th>Tên</th><th>Username</th><th>Vai trò</th><th>Thao tác</th></tr>
+{% for e in employees %}<tr><td>{{e.id}}</td><td>{{e.name}}</td><td>{{e.username}}</td><td>{{e.role}}</td>
+<td><a href="/chamcong/edit/{{e.id}}">Sửa</a> | <a href="/chamcong/delete/{{e.id}}" onclick="return confirm('Xóa?')">Xóa</a> | <a href="/chamcong/log/{{e.id}}">Xem công</a></td></tr>{% endfor %}
+</table></div>
+<p><a href="/">← Về trang chủ</a> | <a href="/chamcong/employee">Trang NV</a> | <a href="/chamcong/logout">Đăng xuất</a></p>
+</div></body></html>

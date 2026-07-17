@@ -1,0 +1,11 @@
+
+<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sửa NV</title><style>body{font-family:system-ui;background:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:100vh}
+.card{background:white;padding:25px;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.1);width:100%;max-width:400px}
+input{width:100%;padding:10px;margin:6px 0;border:1px solid #ccc;border-radius:8px;box-sizing:border-box} button{width:100%;padding:10px;background:#2563eb;color:white;border:none;border-radius:8px;margin-top:10px}
+</style></head><body><div class="card">
+<h3>Sửa nhân viên #{{emp.id}}</h3>
+<form method="POST"><input name="name" value="{{emp.name}}" required><input name="username" value="{{emp.username}}" required><input name="password" placeholder="Mật khẩu mới (để trống nếu không đổi)">
+<select name="role" style="width:100%;padding:10px;margin:6px 0;border-radius:8px"><option value="employee" {% if emp.role=='employee'%}selected{%endif%}>employee</option><option value="admin" {% if emp.role=='admin'%}selected{%endif%}>admin</option></select>
+<button>Lưu</button></form>
+<p><a href="/chamcong/admin">← Quay lại</a></p></div></body></html>

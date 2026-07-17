@@ -1,0 +1,15 @@
+
+<!DOCTYPE html>
+<html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Đăng nhập - Biolinh</title>
+<style>body{font-family:system-ui;background:#f8fafc;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+.card{background:white;padding:30px;border-radius:16px;box-shadow:0 4px 12px rgba(0,0,0,.1);width:100%;max-width:360px}
+input{width:100%;padding:12px;margin:8px 0;border:1px solid #e2e8f0;border-radius:10px;box-sizing:border-box}
+button{width:100%;padding:12px;background:#2563eb;color:white;border:none;border-radius:10px;font-weight:bold;cursor:pointer;margin-top:10px}
+</style></head><body>
+<div class="card"><h2 style="text-align:center">BIOLINH CHẤM CÔNG</h2>
+<form method="POST"><input name="username" placeholder="Tên đăng nhập" required><input name="password" type="password" placeholder="Mật khẩu" required>
+<button>Đăng nhập</button></form>
+{% if error %}<p style="color:red;text-align:center">{{error}}</p>{% endif %}
+<p style="font-size:.8rem;color:#64748b;text-align:center;margin-top:15px">Admin mặc định: admin / 123456</p>
+</div></body></html>

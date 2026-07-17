@@ -1,0 +1,10 @@
+
+<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nhân viên</title><style>body{font-family:system-ui;background:#f8fafc;padding:15px} .card{background:white;padding:20px;border-radius:12px;max-width:500px;margin:20px auto;box-shadow:0 2px 8px rgba(0,0,0,.08);text-align:center}
+.btn{padding:12px 20px;border:none;border-radius:10px;font-weight:bold;cursor:pointer;margin:5px}.in{background:#22c55e;color:white}.out{background:#ef4444;color:white}
+</style></head><body>
+<div class="card"><h2>Xin chào, {{user.name}}</h2><p>{{now}}</p>
+<form method="POST" action="/chamcong/checkin"><button class="btn in">✅ CHECK IN</button></form>
+<form method="POST" action="/chamcong/checkout"><button class="btn out">⛔ CHECK OUT</button></form>
+{% if msg %}<p style="margin-top:15px;background:#dbeafe;padding:10px;border-radius:8px">{{msg}}</p>{% endif %}
+<p><a href="/chamcong/history">Xem lịch sử chấm công</a> | <a href="/chamcong/logout">Đăng xuất</a></p></div></body></html>
