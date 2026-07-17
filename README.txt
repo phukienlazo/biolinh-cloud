@@ -1,0 +1,1 @@
+1. Deploy thu muc nay len Koyeb (chọn app.py)\n2. Copy link Koyeb dán vào auto_sync.py\n3. Chạy auto_sync.py ở máy cá nhân\n

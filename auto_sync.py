@@ -1,30 +1,34 @@
 
-import os, time, requests
+import time, requests, os
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-# === SỬA 2 DÒNG NÀY ===
-CLOUD_URL = "https://ten-app-cua-ban.onrender.com"  # dán link Render vào đây
-TOKEN = "biolinh2hand_2026"
-
-FILES_TO_WATCH = ["khachhang.db", "chamcong.db"]
+# --- CẤU HÌNH ---
+CLOUD_URL = "https://ten-app-cua-ban.koyeb.app"  # <-- dán link Koyeb sau khi deploy vào đây
+TOKEN = "biolinh2hand_2026" # phải khớp với TOKEN ở app.py
+FILES_TO_WATCH = ["database.db"] # bạn có 2 file 112k và 596k, để cả 2 tên vào đây
+# Ví dụ: FILES_TO_WATCH = ["database.db", "database2.db"]
 
 class Handler(FileSystemEventHandler):
     def on_modified(self, event):
         ten = os.path.basename(event.src_path)
-        if ten in FILES_TO_WATCH and not ten.endswith(".tmp"):
-            print(f"-> {ten} thay doi, dang day len...")
+        if ten in FILES_TO_WATCH:
+            print(f"-> Phát hiện {ten} thay đổi, đang đẩy lên cloud...")
             try:
                 with open(event.src_path, 'rb') as f:
                     r = requests.post(f"{CLOUD_URL}/sync/{ten}",
                                       files={'file': f},
                                       headers={'X-TOKEN': TOKEN},
-                                      timeout=30)
-                print("   Thanh cong!" if r.status_code==200 else f"   Loi: {r.text}")
+                                      timeout=15)
+                if r.status_code == 200:
+                    print("   OK đẩy thành công!")
+                else:
+                    print(f"   Lỗi server: {r.text}")
             except Exception as e:
-                print(f"   Loi: {e}")
+                print(f"   Không đẩy được: {e}")
 
-print(f"Dang canh: {FILES_TO_WATCH}")
+print(f"Đang canh các file: {FILES_TO_WATCH}")
+print("Để cửa sổ này chạy ngầm, đừng tắt.")
 observer = Observer()
 observer.schedule(Handler(), ".", recursive=False)
 observer.start()
