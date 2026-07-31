@@ -8,3 +8,5 @@ openpyxl
 psutil
 gevent
 gevent-websocket
+reportlab
+gunicorn
