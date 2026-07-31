@@ -1,0 +1,1585 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Quản Lý Đơn Hàng - Biolinh 2Hand{% endblock %}
+{% block breadcrumb_parent %}Quản lý chính{% endblock %}
+{% block breadcrumb_child %}Quản lý đơn hàng{% endblock %}
+{% block mobile_title %}Quản lý đơn hàng{% endblock %}
+
+{% block head %}
+<!-- GIỮ NGUYÊN 100% CSS & LIB của orders gốc -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+    /* CSS tùy chỉnh cho layout 2 cột giống Desktop */
+    .order-list-container { max-height: 85vh; overflow-y: auto; border-right: 1px solid #dee2e6; }
+    .order-item { cursor: pointer; border-bottom: 1px solid #f0f0f0; transition: background 0.2s; }
+    .order-item:hover, .order-item.active { background-color: #e9ecef; border-left: 4px solid #0d6efd; }
+    .info-label { font-weight: 600; color: #495057; width: 140px; display: inline-block; }
+    .edit-btn { cursor: pointer; color: #0d6efd; margin-left: 8px; font-size: 0.9em; }
+    /* Chống cắt ngang thông tin khi xuất PDF */
+    @media print {
+        #invoiceModalBody table tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+        }
+        #invoiceModalBody .info-item {
+            page-break-inside: avoid !important;
+        }
+        /* Đảm bảo bảng không bị tràn lề */
+        table { page-break-inside: auto; }
+        tr    { page-break-inside: avoid; page-break-after: auto; }
+    }
+
+    /* Class bổ trợ để bao bọc các khối thông tin */
+    .no-split {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+    }
+
+/* Container chính của hóa đơn */
+.invoice-wrapper {
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    color: #333;
+}
+
+/* Thẻ thanh toán (Phần chứa tổng tiền và QR) */
+.payment-card {
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    margin-bottom: 20px;
+}
+
+/* Khu vực mã QR */
+.qr-box {
+    background: #fcfcfc;
+    border: 1px dashed #d1d1d1;
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.qr-box:hover {
+    border-color: #0d6efd;
+    background: #f8fbff;
+}
+
+.qr-code-img {
+    width: 120px;
+    height: 120px;
+    object-fit: contain;
+}
+
+.qr-caption {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #dc3545;
+    margin-top: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Nhãn và giá trị thông tin */
+.label-muted {
+    font-size: 0.85rem;
+    color: #6c757d;
+    width: 110px;
+    display: inline-block;
+}
+
+.value-bold {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #212529;
+}
+
+.total-payment-label {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #444;
+}
+
+.total-payment-value {
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: #dc3545;
+}
+
+/* Bảng sản phẩm chuyên nghiệp */
+.product-table {
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #eee;
+}
+
+.product-table thead {
+    background-color: #f8f9fa;
+}
+
+.product-table th {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #666;
+    border-bottom: 2px solid #dee2e6;
+}
+</style>
+<style>
+/* Fix giao diện khi nằm trong admin_base (Tailwind + Bootstrap) */
+#orderContentWrapper {
+    font-family: Inter, sans-serif;
+}
+#orderContentWrapper .row {
+    --bs-gutter-x: 0;
+}
+.order-list-container {
+    max-height: calc(100vh - 220px) !important;
+}
+/* Ghi đè body background cũ - không để ảnh hưởng layout admin */
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="orderContentWrapper">
+<div class="row g-0 bg-white shadow-sm rounded">
+    
+    <div class="col-md-4 order-list-container p-3">
+        <div class="mb-3">
+            <div class="input-group mb-2">
+                <input type="text" id="liveSearch" class="form-control" placeholder="🔍 Tìm kiếm (Nickname, ID...)" onkeyup="loadOrderList()">
+                <button class="btn btn-warning" onclick="openMergeModal()">
+                    <i class="bi bi-intersect"></i> Gộp đơn
+                </button>
+            </div>
+            <div class="d-flex gap-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="chkDangDon" checked onchange="loadOrderList()">
+                    <label class="form-check-label text-warning fw-bold">Đang Dồn</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="chkDaDi" onchange="loadOrderList()">
+                    <label class="form-check-label text-success fw-bold">Đã Đi Đơn</label>
+                </div>
+            </div>
+        </div>
+        <div id="orderList" class="list-group list-group-flush">
+            </div>
+    </div>
+
+    <div class="col-md-8 p-4 d-none" id="orderDetailPanel">
+        <div class="d-flex justify-content-between align-items-center mb-3 border-bottom pb-2">
+            <h5 class="text-primary mb-0"><i class="bi bi-box-seam"></i> Chi tiết đơn hàng</h5>
+            <div>
+                <button class="btn btn-sm btn-outline-success" title="Đồng bộ khách hàng" onclick="openSyncCustomerModal()"><i class="bi bi-link"></i></button>
+                <!--<button class="btn btn-sm btn-outline-danger" title="Hóa đơn PDF"><i class="bi bi-file-pdf"></i></button>-->
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-6 mb-4">
+                <div class="card border-0 bg-light h-100">
+                    <div class="card-body">
+                        <input type="hidden" id="currentOrderId">
+                        <input type="hidden" id="currentUniqueId">
+                        
+                        <div class="mb-2"><span class="info-label">Mã Đơn:</span> <span id="lblOrderId" class="fw-bold"></span></div>
+                        <div class="mb-2"><span class="info-label">Tên Tiktok:</span> <span id="lblNickname" class="text-primary fw-bold"></span></div>
+                        <div class="mb-2"><span class="info-label">ID Tiktok:</span> <span id="lblUsername"></span></div>
+                        <div class="mb-2"><span class="info-label">Điện Thoại:</span> <span id="lblPhone"></span> <i class="bi bi-pencil edit-btn" onclick="editField('phone', 'Số điện thoại')"></i></div>
+                        <div class="mb-2"><span class="info-label">Địa Chỉ:</span> <span id="lblAddress"></span> <i class="bi bi-pencil edit-btn" onclick="editField('address', 'Địa chỉ')"></i></div>
+                        <div class="mb-2" id="rowStandardAddress" style="display: none;">
+                            <span class="info-label">Địa chỉ chuẩn:</span> 
+                            <span id="lblStandardAddress" class="text-success fw-bold"></span> 
+                            <i class="bi bi-pencil edit-btn" onclick="editField('standard_address', 'Địa chỉ chuẩn')"></i>
+                        </div>
+                        <hr>
+                        <div class="mb-2"><span class="info-label">Trọng Lượng (g):</span> <span id="lblWeight" class="text-danger fw-bold"></span> <i class="bi bi-pencil edit-btn" onclick="editField('weight', 'Trọng lượng (gram)')"></i></div>
+                        <div class="mb-2"><span class="info-label">Tổng Đơn:</span> <span id="lblTotalPrice"></span>đ</div>
+                        <div class="mb-2"><span class="info-label">Đã Cọc:</span> <span id="lblDeposit"></span>đ <i class="bi bi-pencil edit-btn" onclick="editField('deposit', 'Tiền cọc')"></i></div>
+                        <div class="mb-2"><span class="info-label">Phí Ship:</span> <span id="lblShipping"></span>đ</div>
+                        <div class="mb-2"><span class="info-label">Tổng Thanh Toán:</span> <span id="lblTotalPayment" class="text-danger fw-bold fs-5"></span>đ</div>
+                        <hr>
+                        <div class="mb-2">
+                            <span class="info-label">Mã Vận Đơn:</span> 
+                            <span id="lblTracking" class="fw-bold"></span> 
+                            <i class="bi bi-pencil edit-btn" onclick="editField('tracking_number', 'Mã vận đơn')" title="Sửa mã vận đơn"></i>
+                            <i class="bi bi-trash3 edit-btn text-danger ms-2" onclick="cancelVtpOrder()" title="Hủy đơn hàng"></i>
+                        </div>                        
+                        <div class="mt-3 text-end" id="btnCreateOrderContainer">
+                            </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0 text-secondary">Danh sách sản phẩm</h6>
+                    <button class="btn btn-sm btn-primary" onclick="addItem()"><i class="bi bi-plus-lg"></i> Thêm SP</button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle text-center">
+                        <thead class="table-light">
+                            <tr>
+                                <th>STT</th>
+                                <th>Giá (VNĐ)</th>
+                                <th>Ký Gửi</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="itemTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- Modal cập nhật địa chỉ chuẩn -->
+<div class="modal fade" id="addressModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title"><i class="bi bi-geo-alt"></i> Cập nhật Địa chỉ chuẩn</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+            <div class="alert alert-warning py-2 mb-3 border-start border-4 border-warning">
+                <small class="d-block fw-bold text-uppercase text-muted" style="font-size: 0.7rem;">Địa chỉ khách viết (Gốc):</small>
+                <div id="displayOriginalAddr" class="fw-bold text-dark" style="font-size: 0.95rem;">---</div>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label fw-bold small">Tỉnh / Thành phố</label>
+                <input type="text" id="inProvince" class="form-control form-control-sm" list="dlProvince" placeholder="Gõ từ khóa tìm Tỉnh..." oninput="onProvinceInput()">
+                <datalist id="dlProvince"></datalist>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold small">Quận / Huyện</label>
+                <input type="text" id="inDistrict" class="form-control form-control-sm" list="dlDistrict" placeholder="Gõ từ khóa tìm Huyện..." oninput="onDistrictInput()">
+                <datalist id="dlDistrict"></datalist>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-bold small">Phường / Xã</label>
+                <input type="text" id="inWard" class="form-control form-control-sm" list="dlWard" placeholder="Gõ từ khóa tìm Xã..." onkeydown="if(event.key==='Enter') saveStandardAddress()">
+                <datalist id="dlWard"></datalist>
+            </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Đóng</button>
+          <button type="button" class="btn btn-primary btn-sm fw-bold" onclick="saveStandardAddress()">Xác nhận & Lưu</button>
+        </div>
+      </div>
+    </div>
+</div>
+<!--kết thúc motal-->
+
+<!-- Modal gộp đơn -->
+<div class="modal fade" id="mergeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-warning text-dark">
+          <h5 class="modal-title"><i class="bi bi-intersect"></i> Gộp các đơn "Đang dồn"</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+              <input type="text" id="mergeSearch" class="form-control" placeholder="Tìm tên khách hoặc ID để gộp..." onkeyup="filterMergeList()">
+          </div>
+          
+          <div style="max-height: 400px; overflow-y: auto;">
+              <table class="table table-hover">
+                  <thead class="table-light">
+                      <tr>
+                          <th style="width: 40px;"><input type="checkbox" id="checkAllMerge" onclick="toggleAllMerge(this)"></th>
+                          <th>ID Đơn</th>
+                          <th>Khách hàng</th>
+                          <th>SĐT</th>
+                          <th>Tổng tiền</th>
+                      </tr>
+                  </thead>
+                  <tbody id="mergeTableBody">
+                      </tbody>
+              </table>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <div class="me-auto text-muted">
+              <small id="mergeCount">Đã chọn: 0 đơn</small>
+          </div>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+          <button type="button" class="btn btn-warning fw-bold" onclick="processMerge()">Xác nhận</button>
+        </div>
+      </div>
+    </div>
+  </div>
+<!--kết thúc modal gộp đơn-->
+<!--Motal hiển thị thông tin trước khi xác nhận gộp đơn-->
+<div class="modal fade" id="confirmMergeModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title"><i class="bi bi-check2-circle"></i> Xác nhận thông tin gộp</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info py-2">
+              Đang gộp <strong id="previewOrderCount">0</strong> đơn hàng.
+          </div>
+          
+          <ul class="list-group mb-3 text-start">
+              <li class="list-group-item d-flex justify-content-between">
+                  <span>Tổng Cân Nặng:</span>
+                  <span id="previewWeight" class="fw-bold text-danger">0 g</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between">
+                  <span>Tổng Tiền Hàng:</span>
+                  <span id="previewTotalPrice" class="fw-bold">0 đ</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between">
+                  <span>Tổng Tiền Cọc:</span>
+                  <span id="previewDeposit" class="fw-bold">0 đ</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between">
+                  <span>Phí Vận Chuyển (Tính lại):</span>
+                  <span id="previewShipping" class="fw-bold">0 đ</span>
+              </li>
+              <li class="list-group-item d-flex justify-content-between bg-light">
+                  <strong class="text-primary">TỔNG THANH TOÁN MỚI:</strong>
+                  <span id="previewTotalPayment" class="fw-bold text-danger fs-5">0 đ</span>
+              </li>
+          </ul>
+  
+          <div class="mb-2">
+              <label class="form-label fw-bold text-dark">Chọn Đơn Gốc (Giữ lại ID & Info KH):</label>
+              <select id="selPrimaryOrder" class="form-select border-primary"></select>
+              <small class="text-muted">Các đơn còn lại sẽ được chuyển sản phẩm sang đơn gốc này và bị xóa bỏ.</small>
+          </div>
+          <div class="mt-3">
+            <button class="btn btn-sm btn-outline-secondary w-100" type="button" data-bs-toggle="collapse" data-bs-target="#collapseItems">
+                Xem chi tiết danh sách sản phẩm gộp
+            </button>
+            <div class="collapse mt-2" id="collapseItems">
+                <div class="card card-body p-0" style="max-height: 200px; overflow-y: auto;">
+                    <table class="table table-sm mb-0 small">
+                        <thead class="table-light">
+                            <tr><th>Đơn cũ</th><th>Giá</th><th>Ký gửi</th></tr>
+                        </thead>
+                        <tbody id="previewItemTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="backToMergeModal()">Quay lại</button>
+          <button type="button" class="btn btn-success fw-bold" onclick="executeMerge()">Thực hiện gộp</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!--kết thúc modal xác nhận gộp đơn-->
+<!-- Modal hóa đơn -->
+<div class="modal fade" id="invoiceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-receipt"></i> Thông tin đơn hàng</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body bg-white" id="invoiceModalBody">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary fw-bold" onclick="copyInvoiceToClipboard()">
+                    <i class="bi bi-clipboard-plus"></i> Copy ảnh
+                </button>
+                <button type="button" class="btn btn-success fw-bold" onclick="captureInvoiceImage()">
+                    <i class="bi bi-camera"></i> Chụp ảnh
+                </button>
+                <button type="button" class="btn btn-danger fw-bold" onclick="exportInvoicePDF()">
+                    <i class="bi bi-file-earmark-pdf"></i> Xuất PDF
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!--kết thúc modal hóa đơn-->
+<!--Motal quy đổi kích thước-->
+<div class="modal fade" id="dimensionModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog">
+        <div class="modal-content border-danger shadow-lg">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-rulers"></i> Hàng cồng kềnh (>= 10kg)</h5>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">Theo quy định, hàng trên 10kg cần tính trọng lượng quy đổi giữa cân nặng thực tế và kích thước kiện hàng.</p>
+                
+                <div class="alert alert-warning py-2">
+                    Cân nặng thực tế: <strong id="valActualWeight">0</strong> g
+                </div>
+
+                <div class="row g-2">
+                    <div class="col-4">
+                        <label class="form-label">Dài (cm)</label>
+                        <input type="number" id="dimL" class="form-control" placeholder="0" oninput="calcVolumetric()">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Rộng (cm)</label>
+                        <input type="number" id="dimW" class="form-control" placeholder="0" oninput="calcVolumetric()">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label">Cao (cm)</label>
+                        <input type="number" id="dimH" class="form-control" placeholder="0" oninput="calcVolumetric()">
+                    </div>
+                </div>
+
+                <div class="mt-4 p-3 bg-light border rounded">
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Trọng lượng quy đổi:</span>
+                        <span id="valVolumetric" class="fw-bold">0 g</span>
+                    </div>
+                    <div class="d-flex justify-content-between pt-2 border-top">
+                        <span class="text-primary fw-bold">Trọng lượng áp dụng:</span>
+                        <span id="valFinalWeight" class="text-danger fw-bold fs-5">0 g</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeDimModal()">Hủy</button>
+                <button type="button" class="btn btn-danger fw-bold" onclick="submitWeightWithDim()">XÁC NHẬN CẬP NHẬT</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!--kết thúc modal quy đổi kích thước-->
+<!--motal đồng bộ khách hàng-->
+<div class="modal fade" id="syncCustomerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-link"></i> Đồng bộ thông tin khách hàng</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-success py-2 small">
+                    Đang đồng bộ cho nick: <strong id="syncTargetNickname"></strong> (ID: <span id="syncTargetUsername"></span>)
+                </div>
+                <div class="mb-3">
+                    <input type="text" id="syncSearch" class="form-control" placeholder="🔍 Tìm tên, ID Tiktok hoặc SĐT khách hàng đã có..." onkeyup="searchSyncCustomer()">
+                </div>
+                <div class="table-responsive" style="max-height: 350px; overflow-y: auto;">
+                    <table class="table table-hover table-bordered align-middle text-center" style="font-size: 0.9em;">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Khách hàng</th>
+                                <th>ID Tiktok</th>
+                                <th>SĐT</th>
+                                <th>Địa chỉ</th>
+                                <th style="width: 90px;">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="syncCustomerTableBody">
+                            <tr><td colspan="5" class="text-muted">Nhập từ khóa để tìm kiếm...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!--kết thúc modal đồng bộ khách hàng-->
+
+</div>
+
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+
+// Biến lưu trữ dữ liệu order hiện tại
+let currentOrderData = null;
+let currentOrderItems = [];
+
+async function cancelVtpOrder() {
+    const orderId = document.getElementById('currentOrderId').value;
+    if (!orderId) return;
+
+    if (!confirm("Bạn có chắc chắn muốn HỦY đơn hàng này?\n(Hệ thống sẽ xóa mã vận đơn và chuyển trạng thái về 'Đang Dồn')")) {
+        return;
+    }
+
+    try {
+        // 1. Cập nhật mã vận đơn về rỗng
+        let res1 = await fetch('/api/order/update', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ order_id: orderId, field: 'tracking_number', value: '' })
+        });
+        let result1 = await res1.json();
+
+        // 2. Cập nhật trạng thái về Đang Dồn
+        let res2 = await fetch('/api/order/update', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ order_id: orderId, field: 'status', value: 'Đang Dồn' })
+        });
+        let result2 = await res2.json();
+
+        if (result1.ok && result2.ok) {
+            alert("Đã hủy đơn hàng thành công!");
+            // Tải lại chi tiết đơn hàng hiện tại
+            await openOrder(orderId, document.querySelector('.order-item.active'));
+            // Refresh lại danh sách panel bên trái
+            await loadOrderList();
+        } else {
+            alert("Lỗi khi hủy đơn: " + (result1.error || result2.error || "Không rõ nguyên nhân"));
+        }
+    } catch (err) {
+        console.error("Lỗi kết nối:", err);
+        alert("Lỗi kết nối server khi hủy đơn");
+    }
+}
+
+async function loadOrderList() {
+    const search = document.getElementById('liveSearch').value;
+    const isDangDon = document.getElementById('chkDangDon').checked;
+    const isDaDi = document.getElementById('chkDaDi').checked;
+    
+    // Tạo bộ lọc status
+    let statusFilter = "";
+    if (isDangDon && !isDaDi) statusFilter = "Đang Dồn";
+    else if (!isDangDon && isDaDi) statusFilter = "Đã Đi Đơn";
+
+    const res = await fetch(`/api/orders?search=${search}&status=${statusFilter}`);
+    const data = await res.json();
+    
+    const list = document.getElementById('orderList');
+    list.innerHTML = '';
+    
+    data.data.forEach(order => {
+        const badge = order.status === 'Đang Dồn' ? 'bg-warning text-dark' : 'bg-success';
+        list.innerHTML += `
+            <div class="p-3 order-item" onclick="openOrder('${order.order_id}', this)">
+                <div class="d-flex justify-content-between mb-1">
+                    <span class="fw-bold text-dark"><i class="bi bi-person"></i> ${order.nickname}</span>
+                    <span class="badge ${badge}">${order.status}</span>
+                </div>
+                <div class="text-secondary small">
+                    ${order.order_id}
+                </div>
+            </div>
+        `;
+    });
+}
+//  ${order.username}
+async function openOrder(orderId, element) {
+    // Đổi màu item đang chọn
+    document.querySelectorAll('.order-item').forEach(el => el.classList.remove('active'));
+    if(element) element.classList.add('active');
+
+    // Mở panel chi tiết
+    document.getElementById('orderDetailPanel').classList.remove('d-none');
+    
+    // Gọi API lấy full data
+    const res = await fetch(`/api/order/${orderId}`);
+    const data = await res.json();
+
+    document.getElementById('lblAddress').innerText = data.order.cus_address || 'Chưa cập nhật';
+    
+    // Logic hiển thị địa chỉ chuẩn
+    const stdAddrLabel = document.getElementById('lblStandardAddress');
+    const stdAddrRow = document.getElementById('rowStandardAddress');
+
+    if (data.order.standard_address && data.order.standard_address.trim() !== "") {
+        stdAddrRow.style.display = 'block';
+        stdAddrLabel.innerText = data.order.standard_address;
+        stdAddrLabel.classList.remove('text-muted');
+        stdAddrLabel.classList.add('text-success');
+    } else {
+        // Vẫn hiện dòng để người dùng thấy nút Sửa
+        stdAddrRow.style.display = 'block'; 
+        stdAddrLabel.innerText = "Chưa cập nhật địa chỉ chuẩn";
+        stdAddrLabel.classList.remove('text-success');
+        stdAddrLabel.classList.add('text-muted');
+    }
+
+
+
+
+
+    currentOrderData = data.order;
+
+    // Đổ dữ liệu vào giao diện
+    document.getElementById('currentOrderId').value = data.order.order_id;
+    document.getElementById('currentUniqueId').value = data.order.username;
+    
+    document.getElementById('lblOrderId').innerText = data.order.order_id;
+    document.getElementById('lblNickname').innerText = data.order.cus_note ? `${data.order.nickname} (${data.order.cus_note})` : data.order.nickname;
+    document.getElementById('lblUsername').innerText = data.order.username;
+    document.getElementById('lblPhone').innerText = data.order.cus_phone || 'Chưa cập nhật';
+    document.getElementById('lblAddress').innerText = data.order.cus_address || 'Chưa cập nhật';
+    
+    document.getElementById('lblWeight').innerText = (data.order.weight || 0).toLocaleString();
+    document.getElementById('lblTotalPrice').innerText = (data.order.total_price || 0).toLocaleString();
+    document.getElementById('lblDeposit').innerText = (data.order.deposit || 0).toLocaleString();
+    document.getElementById('lblShipping').innerText = (data.order.shipping_cost || 0).toLocaleString();
+    document.getElementById('lblTotalPayment').innerText = (data.order.total_payment || 0).toLocaleString();
+    document.getElementById('lblTracking').innerText = data.order.tracking_number || 'Chưa có';
+
+    // Nút tạo đơn
+    // Lưu lại items để hiển thị trên Hóa Đơn
+    currentOrderItems = data.items;
+
+    // Cập nhật lại container chứa nút để chia 2 bên (Trái - Phải)
+    const btnContainer = document.getElementById('btnCreateOrderContainer');
+    btnContainer.className = "mt-3 d-flex justify-content-between align-items-center";
+
+    let rightBtn = '';
+    if (data.order.status === 'Đang Dồn') {
+        rightBtn = `<button id="btnCreateVTP" class="btn btn-warning fw-bold shadow-sm" onclick="createViettelPostOrder('${data.order.order_id}')">
+                        <i class="bi bi-truck"></i> TẠO ĐƠN VIETTELPOST
+                    </button>`;
+    } else {
+        rightBtn = `<a href="https://viettelpost.vn/thong-tin-don-hang?peopleTracking=sender&orderNumber=${data.order.tracking_number}" target="_blank" class="btn btn-info fw-bold text-white"><i class="bi bi-search"></i> Tra cứu đơn hàng</a>`;
+    }
+
+    // Nút Hóa đơn nằm bên trái, cụm nút VTP nằm bên phải
+    btnContainer.innerHTML = `
+        <button class="btn btn-success fw-bold shadow-sm" onclick="openInvoiceModal()">
+            <i class="bi bi-receipt"></i> Hóa Đơn
+        </button>
+        <div>${rightBtn}</div>
+    `;
+
+    // Đổ danh sách sản phẩm
+    const tbody = document.getElementById('itemTableBody');
+    tbody.innerHTML = '';
+    data.items.forEach((item, index) => {
+        tbody.innerHTML += `
+            <tr>
+                <td>${index + 1}</td>
+                <td class="text-primary fw-bold" cursor="pointer" onclick="updateItemPrice(${item.id}, ${item.price})">${item.price.toLocaleString()}</td>
+                <td>${item.kygui || ''}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteItem(${item.id})"><i class="bi bi-trash"></i></button>
+                </td>
+            </tr>
+        `;
+    });
+}
+
+// Cập nhật các trường thông tin chung (Trọng lượng, Tiền cọc...)
+// Biến tạm lưu trữ khi xử lý hàng cồng kềnh
+let tempInputWeight = 0;
+let dimensionModalObj = null;
+
+async function editField(field, label) {
+    if (field === 'standard_address') { openAddressModal(); return; }
+
+    const newVal = prompt(`Nhập ${label} mới:`);
+    if (newVal === null || newVal.trim() === "") return;
+
+    // --- LOGIC XỬ LÝ TRỌNG LƯỢNG 10KG+ ---
+    if (field === 'weight') {
+        const weightNum = parseFloat(newVal);
+        if (weightNum >= 10000) {
+            tempInputWeight = weightNum;
+            showDimensionModal(weightNum);
+            return; // Dừng lại để chờ nhập kích thước ở Modal
+        }
+    }
+
+    const orderId = document.getElementById('currentOrderId').value;
+
+    try {
+        const res = await fetch('/api/order/update', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ order_id: orderId, field: field, value: newVal })
+        });
+        
+        const result = await res.json();
+        
+        if (result.ok) {
+            // 1. Refresh lại giao diện để hiển thị thông tin vừa sửa
+            await openOrder(orderId, null); 
+
+            // 2. Logic nhắc nhở cập nhật địa chỉ chuẩn
+            // Nếu vừa sửa Số điện thoại hoặc Địa chỉ gốc
+            if (field === 'address') {
+                setTimeout(() => {
+                    const confirmUpdate = confirm(`Bạn vừa thay đổi ${label}. Bạn có muốn cập nhật lại "Địa chỉ chuẩn" (Viettel Post) cho khớp không?`);
+                    if (confirmUpdate) {
+                        openAddressModal();
+                    }
+                }, 300); // Delay một chút để giao diện kịp render xong
+            }
+        } else {
+            alert("Lỗi: " + (result.error || "Không thể cập nhật"));
+        }
+    } catch (err) {
+        console.error("Fetch error:", err);
+        alert("Lỗi kết nối server");
+    }
+}
+
+// Hiển thị modal kích thước
+function showDimensionModal(weight) {
+    if (!dimensionModalObj) dimensionModalObj = new bootstrap.Modal(document.getElementById('dimensionModal'));
+    document.getElementById('valActualWeight').innerText = weight.toLocaleString();
+    document.getElementById('dimL').value = '';
+    document.getElementById('dimW').value = '';
+    document.getElementById('dimH').value = '';
+    calcVolumetric(); // Reset các con số
+    dimensionModalObj.show();
+}
+
+// Tính toán trọng lượng quy đổi
+function calcVolumetric() {
+    const l = parseFloat(document.getElementById('dimL').value) || 0;
+    const w = parseFloat(document.getElementById('dimW').value) || 0;
+    const h = parseFloat(document.getElementById('dimH').value) || 0;
+    
+    // Công thức: (Dài x Rộng x Cao) / 5
+    const volWeight = (l * w * h) / 5;
+    
+    // So sánh lấy giá trị lớn nhất
+    const finalWeight = Math.max(tempInputWeight, volWeight);
+    
+    document.getElementById('valVolumetric').innerText = volWeight.toLocaleString() + " g";
+    document.getElementById('valFinalWeight').innerText = finalWeight.toLocaleString() + " g";
+}
+
+// Xác nhận gửi dữ liệu sau khi tính kích thước
+async function submitWeightWithDim() {
+    const l = parseFloat(document.getElementById('dimL').value);
+    const w = parseFloat(document.getElementById('dimW').value);
+    const h = parseFloat(document.getElementById('dimH').value);
+
+    if (!l || !w || !h) {
+        alert("Vui lòng nhập đầy đủ 3 kích thước Dài, Rộng, Cao!");
+        return;
+    }
+
+    const volWeight = (l * w * h) / 5;
+    const finalWeight = Math.max(tempInputWeight, volWeight);
+    
+    await sendUpdateAPI('weight', finalWeight);
+    dimensionModalObj.hide();
+}
+
+function closeDimModal() {
+    dimensionModalObj.hide();
+}
+
+// Hàm bổ trợ gửi API (Tách ra để dùng chung)
+async function sendUpdateAPI(field, value) {
+    const orderId = document.getElementById('currentOrderId').value;
+    try {
+        const res = await fetch('/api/order/update', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ order_id: orderId, field: field, value: value })
+        });
+        const result = await res.json();
+        if (result.ok) {
+            await openOrder(orderId, null);
+            if (field === 'phone' || field === 'address') {
+                setTimeout(() => {
+                    if (confirm(`Bạn muốn cập nhật "Địa chỉ chuẩn" không?`)) openAddressModal();
+                }, 300);
+            }
+        } else {
+            alert("Lỗi: " + result.error);
+        }
+    } catch (err) {
+        alert("Lỗi kết nối server");
+    }
+}
+
+let addrModal = null; // Biến toàn cục để quản lý modal
+
+function openAddressModal() {
+    // 1. Khởi tạo modal nếu chưa có
+    if(!addrModal) {
+        const modalElem = document.getElementById('addressModal');
+        if (modalElem) {
+            addrModal = new bootstrap.Modal(modalElem);
+        } else {
+            console.error("Không tìm thấy element #addressModal trong HTML");
+            return;
+        }
+    }
+
+    // 2. Lấy địa chỉ gốc để hiển thị vào modal (SỬA ĐÚNG ID TẠI ĐÂY)
+    const addrSource = document.getElementById('lblAddress');
+    const originalText = (addrSource && addrSource.innerText.trim() !== '') ? addrSource.innerText : "Chưa cập nhật địa chỉ gốc";
+    
+    const displayTarget = document.getElementById('displayOriginalAddr');
+    if (displayTarget) {
+        displayTarget.innerText = originalText;
+    }
+
+    // 3. Reset các ô nhập liệu về trống
+    ['inProvince', 'inDistrict', 'inWard'].forEach(id => {
+        const el = document.getElementById(id);
+        if(el) el.value = '';
+    });
+
+    // 4. Load dữ liệu và hiện modal
+    loadProvinces();
+    addrModal.show();
+}
+
+// Biến lưu trữ dữ liệu thô để tra cứu ID (tương tự data_store trong Python)
+let addrDataStore = { p: [], d: [], w: [] };
+let addrSearchTimer = null;
+
+// 1. Tải danh sách Tỉnh ban đầu
+async function loadProvinces() {
+    const res = await fetch('/api/address/provinces');
+    addrDataStore.p = await res.json();
+    
+    const dl = document.getElementById('dlProvince');
+    dl.innerHTML = '';
+    addrDataStore.p.forEach(p => {
+        dl.innerHTML += `<option value="${p.PROVINCE_NAME}">`;
+    });
+}
+
+// 2. Xử lý khi gõ/chọn Tỉnh
+function onProvinceInput() {
+    clearTimeout(addrSearchTimer);
+    addrSearchTimer = setTimeout(async () => {
+        const val = document.getElementById('inProvince').value;
+        const pObj = addrDataStore.p.find(i => i.PROVINCE_NAME === val);
+
+        if (pObj) {
+            // Reset các ô dưới
+            document.getElementById('inDistrict').value = '';
+            document.getElementById('inWard').value = '';
+            document.getElementById('dlDistrict').innerHTML = '';
+            
+            // Tải Quận/Huyện
+            const res = await fetch(`/api/address/districts/${pObj.PROVINCE_ID}`);
+            addrDataStore.d = await res.json();
+            
+            const dl = document.getElementById('dlDistrict');
+            addrDataStore.d.forEach(d => {
+                dl.innerHTML += `<option value="${d.DISTRICT_NAME}">`;
+            });
+            document.getElementById('inDistrict').focus();
+        }
+    }, 400); // Đợi 400ms sau khi ngừng gõ (Debounce)
+}
+
+// 3. Xử lý khi gõ/chọn Huyện
+function onDistrictInput() {
+    clearTimeout(addrSearchTimer);
+    addrSearchTimer = setTimeout(async () => {
+        const val = document.getElementById('inDistrict').value;
+        const dObj = addrDataStore.d.find(i => i.DISTRICT_NAME === val);
+
+        if (dObj) {
+            document.getElementById('inWard').value = '';
+            
+            // Tải Phường/Xã
+            const res = await fetch(`/api/address/wards/${dObj.DISTRICT_ID}`);
+            addrDataStore.w = await res.json();
+            
+            const dl = document.getElementById('dlWard');
+            dl.innerHTML = '';
+            addrDataStore.w.forEach(w => {
+                dl.innerHTML += `<option value="${w.WARDS_NAME}">`;
+            });
+            document.getElementById('inWard').focus();
+        }
+    }, 400);
+}
+
+// 4. Lưu địa chỉ (Tương tự hàm save_address trong Python)
+async function saveStandardAddress() {
+    const pName = document.getElementById('inProvince').value;
+    const dName = document.getElementById('inDistrict').value;
+    const wName = document.getElementById('inWard').value;
+
+    // Lookup ID từ tên (Tuyệt đối chính xác)
+    const pObj = addrDataStore.p.find(i => i.PROVINCE_NAME === pName);
+    const dObj = addrDataStore.d.find(i => i.DISTRICT_NAME === dName);
+    const wObj = addrDataStore.w.find(i => i.WARDS_NAME === wName);
+
+    if (!pObj || !dObj || !wObj) {
+        alert("Vui lòng chọn địa chỉ từ danh sách gợi ý!");
+        return;
+    }
+
+    const phone = document.getElementById('lblPhone').innerText.trim();
+    const orderId = document.getElementById('currentOrderId').value;
+
+    const payload = {
+        phone: phone,
+        province_id: pObj.PROVINCE_ID,
+        province_name: pObj.PROVINCE_NAME,
+        district_id: dObj.DISTRICT_ID,
+        district_name: dObj.DISTRICT_NAME,
+        ward_id: wObj.WARDS_ID,
+        ward_name: wObj.WARDS_NAME
+    };
+
+    try {
+        const res = await fetch('/api/address/save', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+
+        const result = await res.json();
+        if (result.ok) {
+            addrModal.hide();
+            // Reset form
+            document.getElementById('inProvince').value = '';
+            document.getElementById('inDistrict').value = '';
+            document.getElementById('inWard').value = '';
+            // Refresh chi tiết đơn
+            openOrder(orderId, null); 
+        } else {
+            alert("Lỗi: " + result.error);
+        }
+    } catch (err) {
+        alert("Không thể kết nối máy chủ");
+    }
+}
+
+async function addItem() {
+    const price = prompt("Nhập giá sản phẩm mới:");
+    if (price && !isNaN(price)) {
+        await fetch('/api/item/action', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                action: 'add',
+                order_id: currentOrderData.order_id,
+                nickname: currentOrderData.nickname,
+                username: currentOrderData.username,
+                price: parseFloat(price)
+            })
+        });
+        // Note: Ở hệ thống thực tế cần tính lại tổng đơn ở Backend, tôi sẽ hướng dẫn ở bước sau
+        openOrder(currentOrderData.order_id, null);
+    }
+}
+
+
+// Cập nhật giá sản phẩm
+async function updateItemPrice(itemId, oldPrice) {
+    const price = prompt("Nhập giá mới:", oldPrice);
+    if (price && !isNaN(price)) {
+        const orderId = document.getElementById('currentOrderId').value;
+        const res = await fetch('/api/item/action', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ 
+                action: 'update', 
+                item_id: itemId, 
+                price: parseFloat(price), 
+                order_id: orderId 
+            })
+        });
+        if ((await res.json()).ok) openOrder(orderId, null);
+    }
+}
+
+// Xóa sản phẩm
+async function deleteItem(itemId) {
+    if (!confirm("Bạn có chắc chắn muốn xóa sản phẩm này?")) return;
+
+    // Lấy ID đơn hàng hiện tại từ input hidden
+    const orderId = document.getElementById('currentOrderId').value;
+
+    try {
+        const res = await fetch('/api/item/action', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ 
+                action: 'delete', 
+                item_id: itemId 
+            })
+        });
+
+        const data = await res.json();
+        if (data.ok) {
+            // Tải lại chi tiết đơn hàng để thấy Tổng tiền và Phí ship mới
+            openOrder(orderId, null);
+        } else {
+            alert("Lỗi khi xóa: " + data.error);
+        }
+    } catch (err) {
+        console.error("Lỗi kết nối:", err);
+    }
+}
+
+// Hàm mở modal gộp đơn
+let mergeModalObj = null;
+let allPendingOrders = []; // Lưu danh sách đơn "Đang dồn" để search nhanh
+
+async function openMergeModal() {
+    if (!mergeModalObj) mergeModalObj = new bootstrap.Modal(document.getElementById('mergeModal'));
+    
+    // Gọi API với tham số status để lọc ngay từ database
+    const res = await fetch('/api/orders?status=Đang Dồn'); 
+    const result = await res.json();
+    
+    // TRUY CẬP VÀO result.data (vì API trả về {data: [...]})
+    allPendingOrders = result.data || [];
+    
+    renderMergeTable(allPendingOrders);
+    mergeModalObj.show();
+}
+
+function renderMergeTable(data) {
+    const tbody = document.getElementById('mergeTableBody');
+    tbody.innerHTML = '';
+    
+    if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Không có đơn hàng nào "Đang Dồn"</td></tr>';
+        return;
+    }
+    
+    data.forEach(order => {
+        tbody.innerHTML += `
+            <tr>
+                <td><input type="checkbox" class="merge-checkbox" value="${order.order_id}" onchange="updateMergeCount()"></td>
+                <td><small class="text-primary fw-bold">${order.order_id}</small></td>
+                <td>${order.nickname || order.username}</td> <td>${order.phone || ''}</td>
+                <td class="text-danger fw-bold">${(order.total_price || 0).toLocaleString('vi-VN')} đ</td>
+            </tr>
+        `;
+    });
+    updateMergeCount();
+}
+
+// Tìm kiếm nhanh trong Modal
+
+function filterMergeList() {
+    const kw = document.getElementById('mergeSearch').value.toLowerCase();
+    const filtered = allPendingOrders.filter(o => 
+        (o.nickname && o.nickname.toLowerCase().includes(kw)) || // Đã bổ sung nickname
+        (o.username && o.username.toLowerCase().includes(kw)) || 
+        (o.order_id && o.order_id.toString().toLowerCase().includes(kw)) || // Đã thêm toLowerCase()
+        (o.phone && o.phone.includes(kw)) // SĐT vẫn giữ nguyên định dạng raw text
+    );
+    renderMergeTable(filtered);
+}
+
+// Chọn tất cả
+function toggleAllMerge(source) {
+    const checkboxes = document.querySelectorAll('.merge-checkbox');
+    checkboxes.forEach(cb => cb.checked = source.checked);
+    updateMergeCount();
+}
+
+// Cập nhật số lượng đơn đã chọn
+function updateMergeCount() {
+    const selected = document.querySelectorAll('.merge-checkbox:checked').length;
+    document.getElementById('mergeCount').innerText = `Đã chọn: ${selected} đơn`;
+}
+
+// Hàm xử lý gộp (Bước sau sẽ viết logic server)
+let confirmMergeModalObj = null;
+let selectedMergeIds = [];
+
+async function processMerge() {
+    // 1. Lấy danh sách ID đã tích
+    const checkboxes = document.querySelectorAll('.merge-checkbox:checked');
+    selectedMergeIds = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (selectedMergeIds.length < 2) {
+        alert("Vui lòng chọn ít nhất 2 đơn hàng để gộp!");
+        return;
+    }
+
+    // 2. Gọi API để Server tính toán thử
+    const res = await fetch('/api/orders/preview_merge', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ order_ids: selectedMergeIds })
+    });
+    
+    const data = await res.json();
+    if (!data.ok) { alert(data.error); return; }
+
+    // 3. Đổ dữ liệu vào Modal Xác nhận
+    const sum = data.summary;
+    document.getElementById('previewOrderCount').innerText = sum.order_count;
+    document.getElementById('previewWeight').innerText = sum.new_weight.toLocaleString() + ' g';
+    document.getElementById('previewTotalPrice').innerText = sum.new_total_price.toLocaleString() + ' đ';
+    document.getElementById('previewDeposit').innerText = sum.new_deposit.toLocaleString() + ' đ';
+    document.getElementById('previewShipping').innerText = sum.new_shipping_cost.toLocaleString() + ' đ';
+    document.getElementById('previewTotalPayment').innerText = sum.new_total_payment.toLocaleString() + ' đ';
+
+    // Đổ danh sách sản phẩm Preview
+    const itemTable = document.getElementById('previewItemTable');
+    itemTable.innerHTML = '';
+    data.items.forEach(item => {
+        itemTable.innerHTML += `<tr>
+            <td>${item.order_id}</td>
+            <td class="text-primary">${item.price.toLocaleString()}</td>
+            <td>${item.kygui || ''}</td>
+        </tr>`;
+    });
+
+    // 4. Cập nhật list dropdown Đơn gốc
+    const selPrimary = document.getElementById('selPrimaryOrder');
+    selPrimary.innerHTML = '';
+
+    // Sử dụng [...selectedMergeIds].reverse() để đảo ngược thứ tự hiển thị
+    [...selectedMergeIds].reverse().forEach(id => {
+        selPrimary.innerHTML += `<option value="${id}">Mã đơn: ${id}</option>`;
+    });
+
+    // 5. Chuyển đổi Modal
+    if (!confirmMergeModalObj) confirmMergeModalObj = new bootstrap.Modal(document.getElementById('confirmMergeModal'));
+    mergeModalObj.hide();
+    confirmMergeModalObj.show();
+}
+
+function backToMergeModal() {
+    confirmMergeModalObj.hide();
+    mergeModalObj.show();
+}
+
+
+// Hàm thực hiện gộp cuối cùng
+async function executeMerge() {
+    const primaryId = document.getElementById('selPrimaryOrder').value;
+    
+    if (!confirm("Hệ thống sẽ xóa các đơn cũ và tạo 1 đơn tổng duy nhất. Bạn chắc chắn chứ?")) return;
+
+    const res = await fetch('/api/orders/execute_merge', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            primary_id: primaryId,
+            all_ids: selectedMergeIds
+        })
+    });
+
+    const result = await res.json();
+    if (result.ok) {
+        alert("Gộp đơn thành công!");
+        confirmMergeModalObj.hide();
+        loadOrderList(); // Tải lại danh sách đơn hàng bên ngoài
+    } else {
+        alert("Lỗi: " + result.error);
+    }
+}
+
+// Hàm mở modal hóa đơn
+let invoiceModalObj = null;
+
+function openInvoiceModal() {
+    if (!currentOrderData) return;
+    if (!invoiceModalObj) invoiceModalObj = new bootstrap.Modal(document.getElementById('invoiceModal'));
+
+    // 1. Render danh sách sản phẩm
+    let itemRows = '';
+    currentOrderItems.forEach((item, index) => {
+        itemRows += `
+            <tr>
+                <td class="text-center text-muted">${index + 1}</td>
+                <td class="text-primary fw-bold text-end pe-3">${item.price.toLocaleString()} đ</td>
+            </tr>
+        `;
+    });
+
+    // 2. Cấu hình VietQR
+    const bankBin = "970441"; 
+    const accountNumber = "983424342";
+    const accountName = "CAO XUAN BACH";
+    const totalPayment = currentOrderData.total_payment || 0;
+    const addInfo = encodeURIComponent(`${currentOrderData.order_id}`);
+    
+    let qrHtml = "";
+    if (totalPayment > 0) {
+        const qrUrl = `https://img.vietqr.io/image/${bankBin}-${accountNumber}-compact2.png?amount=${totalPayment}&addInfo=${addInfo}&accountName=${encodeURIComponent(accountName)}`;
+        qrHtml = `
+            <div class="qr-box">
+                <img src="${qrUrl}" alt="QR" class="qr-code-img">
+                <div class="qr-caption"><i class="bi bi-qr-code-scan"></i> Quét thanh toán</div>
+            </div>
+        `;
+    } else {
+        qrHtml = `
+            <div class="qr-box border-success" style="background: #f0fff4;">
+                <div class="text-success py-3">
+                    <i class="bi bi-check-circle-fill fs-1"></i>
+                    <div class="fw-bold mt-2 small">ĐÃ THANH TOÁN</div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 3. Render HTML Hóa đơn
+    const invoiceHTML = `
+        <div class="invoice-wrapper px-1">
+            <div class="row mb-3">
+                <div class="col-12">
+                    <div class="mb-1"><span class="label-muted">Mã Đơn:</span> <span class="value-bold">#${currentOrderData.order_id}</span></div>
+                    <div class="mb-1"><span class="label-muted">Khách hàng:</span> <span class="text-primary fw-bold">${currentOrderData.nickname}</span></div>
+                    <div class="mb-1"><span class="label-muted">Điện thoại:</span> <span class="value-bold">${currentOrderData.cus_phone || '---'}</span></div>
+                    <div class="mb-1 d-flex">
+                        <span class="label-muted flex-shrink-0">Địa chỉ:</span> 
+                        <span class="value-bold" style="font-size: 0.8rem; line-height: 1.4;">${currentOrderData.cus_address || '---'}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="payment-card">
+                <div class="row align-items-center">
+                    <div class="col-7">
+                        <div class="mb-1"><span class="label-muted" style="width: 90px;">Cân nặng:</span> <span class="value-bold">${(currentOrderData.weight || 0).toLocaleString()} g</span></div>
+                        <div class="mb-1"><span class="label-muted" style="width: 90px;">Tổng tiền:</span> <span class="value-bold">${(currentOrderData.total_price || 0).toLocaleString()} đ</span></div>
+                        <div class="mb-1"><span class="label-muted" style="width: 90px;">Phí ship:</span> <span class="value-bold">${(currentOrderData.shipping_cost || 0).toLocaleString()} đ</span></div>
+                        <div class="mb-1"><span class="label-muted" style="width: 90px;">Đã cọc:</span> <span class="text-success fw-bold">${(currentOrderData.deposit || 0).toLocaleString()} đ</span></div>
+                        
+                        <div class="mt-3 pt-2 border-top">
+                            <div class="total-payment-label">CẦN THANH TOÁN</div>
+                            <div class="total-payment-value">${totalPayment.toLocaleString()} đ</div>
+                        </div>
+                    </div>
+                    <div class="col-5">
+                        ${qrHtml}
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mb-2">
+                <span class="badge bg-light text-secondary px-3 py-2 text-uppercase" style="letter-spacing: 1px; font-size: 0.7rem;">Chi tiết sản phẩm</span>
+            </div>
+            <table class="table table-sm product-table align-middle">
+                <thead>
+                    <tr>
+                        <th class="text-center" style="width: 60px;">STT</th>
+                        <th class="text-end pe-3">Đơn giá</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${itemRows || '<tr><td colspan="2" class="text-center text-muted py-3">Không có sản phẩm</td></tr>'}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    document.getElementById('invoiceModalBody').innerHTML = invoiceHTML;
+    invoiceModalObj.show();
+}
+
+function exportInvoicePDF() {
+    const element = document.getElementById('invoiceModalBody');
+    const orderId = document.getElementById('currentOrderId').value;
+    const nickname = document.getElementById('lblNickname').innerText;
+
+    // Cấu hình nâng cao để xử lý chuyển trang
+    const opt = {
+        margin:       [15, 10, 15, 10], 
+        filename:     `HoaDon_${orderId}_${nickname}.pdf`,
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { 
+            scale: 2, 
+            useCORS: true, 
+            letterRendering: true,
+            scrollY: 0 
+        },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        // ĐÃ SỬA: Bỏ 'avoid-all', sử dụng 'css' và chỉ định rõ tránh cắt ngang dòng thẻ 'tr'
+        pagebreak:    { mode: ['css', 'legacy'], avoid: 'tr' } 
+    };
+
+    // Thực hiện xuất file
+    html2pdf().set(opt).from(element).toPdf().get('pdf').then(function (pdf) {
+        // Có thể thêm số trang ở đây nếu muốn
+    }).save();
+}
+
+// Hàm chụp ảnh nội dung Hóa đơn
+function captureInvoiceImage() {
+    const element = document.getElementById('invoiceModalBody');
+    const orderId = document.getElementById('currentOrderId').value;
+    const nickname = document.getElementById('lblNickname').innerText;
+
+    // Đổi UI sang trạng thái loading (tuỳ chọn để báo hiệu cho người dùng)
+    const btn = document.querySelector('button[onclick="captureInvoiceImage()"]');
+    const originalText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Đang chụp...`;
+
+    // Gọi html2canvas (thư viện đi kèm khi dùng html2pdf)
+    html2canvas(element, {
+        scale: 2, // scale=2 giúp ảnh nét hơn (giống Retina display)
+        useCORS: true, // Hỗ trợ load ảnh từ tên miền khác (nếu có)
+        backgroundColor: '#ffffff' // Đảm bảo nền màu trắng, không bị trong suốt
+    }).then(function(canvas) {
+        // 1. Chuyển canvas thành dạng URL của ảnh PNG
+        const imgData = canvas.toDataURL('image/png');
+        
+        // 2. Tạo một thẻ <a> ảo để kích hoạt hành động tải xuống
+        const link = document.createElement('a');
+        link.download = `HoaDon_${orderId}_${nickname}.png`; // Tên file ảnh
+        link.href = imgData;
+        link.click();
+    }).catch(function(error) {
+        console.error("Lỗi khi chụp ảnh:", error);
+        alert("Có lỗi xảy ra khi chụp ảnh hóa đơn!");
+    }).finally(function() {
+        // Trả lại trạng thái nút ban đầu
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    });
+}
+
+// hàm copy ảnh hóa đơn vào clipboard (dùng Clipboard API, chỉ hỗ trợ trên HTTPS và một số trình duyệt nhất định)
+async function copyInvoiceToClipboard() {
+    const element = document.getElementById('invoiceModalBody');
+    const btn = document.querySelector('button[onclick="copyInvoiceToClipboard()"]');
+    const originalText = btn.innerHTML;
+
+    // Trạng thái loading
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Đang xử lý...`;
+
+    try {
+        // 1. Chụp vùng nội dung thành canvas
+        const canvas = await html2canvas(element, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff'
+        });
+
+        // 2. Chuyển canvas thành Blob (dạng dữ liệu nhị phân của ảnh)
+        canvas.toBlob(async (blob) => {
+            try {
+                // 3. Sử dụng Clipboard API để lưu ảnh vào bộ nhớ tạm
+                const item = new ClipboardItem({ "image/png": blob });
+                await navigator.clipboard.write([item]);
+                
+                // Thông báo thành công trên nút
+                btn.className = "btn btn-outline-primary fw-bold";
+                btn.innerHTML = `<i class="bi bi-check-lg"></i> Đã Copy!`;
+                
+                // Reset lại nút sau 2 giây
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.className = "btn btn-primary fw-bold";
+                    btn.innerHTML = originalText;
+                }, 2000);
+            } catch (err) {
+                console.error("Lỗi khi ghi vào Clipboard:", err);
+                alert("Trình duyệt của bạn có thể chưa hỗ trợ copy ảnh trực tiếp.");
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }, 'image/png');
+
+    } catch (error) {
+        console.error("Lỗi html2canvas:", error);
+        alert("Không thể chụp ảnh hóa đơn.");
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+// Hàm gửi API tạo đơn Viettel Post
+async function createViettelPostOrder(orderId) {
+    // Basic validation trước khi đẩy lên server
+    const weight = parseInt(document.getElementById('lblWeight').innerText.replace(/,/g, ''));
+    if (weight <= 0 || isNaN(weight)) {
+        alert("Vui lòng nhập trọng lượng kiện hàng lớn hơn 0 trước khi tạo đơn!");
+        return;
+    }
+
+    const btn = document.getElementById('btnCreateVTP');
+    const originalText = btn.innerHTML;
+    
+    // Đổi UI sang trạng thái loading để tránh bấm đúp
+    btn.disabled = true;
+    btn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Đang gửi ViettelPost...`;
+
+    try {
+        const res = await fetch('/api/order/create_vtp', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ order_id: orderId })
+        });
+        
+        const data = await res.json();
+        
+        if (data.ok) {
+            alert(`Tạo đơn thành công! Mã vận đơn: ${data.tracking_number}`);
+            // Tải lại chi tiết đơn hàng (Sẽ chuyển sang trạng thái Đã đi đơn & Hiện nút Tra cứu)
+            openOrder(orderId, document.querySelector('.order-item.active'));
+            // Refresh lại danh sách panel bên trái
+            loadOrderList(); 
+        } else {
+            alert("Lỗi tạo đơn: " + data.error);
+        }
+    } catch (err) {
+        console.error("Lỗi kết nối:", err);
+        alert("Lỗi kết nối đến máy chủ.");
+    } finally {
+        // Trả lại UI nút bấm nếu có lỗi (nếu thành công thì openOrder đã vẽ lại nút rồi)
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+}
+
+// ==================== LOGIC ĐỒNG BỘ KHÁCH HÀNG ====================
+let syncModalObj = null;
+
+function openSyncCustomerModal() {
+    if (!currentOrderData) return;
+    if (!syncModalObj) syncModalObj = new bootstrap.Modal(document.getElementById('syncCustomerModal'));
+    
+    // Đổ thông tin nick đích lên giao diện để nhắc nhở
+    document.getElementById('syncTargetNickname').innerText = currentOrderData.nickname;
+    document.getElementById('syncTargetUsername').innerText = currentOrderData.username;
+    
+    // Reset lại ô tìm kiếm và bảng
+    document.getElementById('syncSearch').value = '';
+    document.getElementById('syncCustomerTableBody').innerHTML = '<tr><td colspan="5" class="text-muted">Nhập từ khóa để tìm kiếm...</td></tr>';
+    
+    syncModalObj.show();
+}
+
+let syncSearchTimeout = null;
+async function searchSyncCustomer() {
+    clearTimeout(syncSearchTimeout);
+    const kw = document.getElementById('syncSearch').value.trim();
+    const tbody = document.getElementById('syncCustomerTableBody');
+    
+    if (kw.length < 2) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-muted">Nhập ít nhất 2 ký tự...</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = '<tr><td colspan="5"><div class="spinner-border spinner-border-sm text-success"></div> Đang tìm kiếm...</td></tr>';
+
+    // Dùng setTimeout (Debounce) để không gọi API liên tục khi đang gõ
+    syncSearchTimeout = setTimeout(async () => {
+        try {
+            const res = await fetch(`/api/customers?q=${encodeURIComponent(kw)}`);
+            const data = await res.json();
+            
+            tbody.innerHTML = '';
+            if (!data || data.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-muted">Không tìm thấy khách hàng nào khớp.</td></tr>';
+                return;
+            }
+
+            // Loại bỏ chính nick hiện tại ra khỏi danh sách nguồn để tránh tự đồng bộ cho chính mình
+            const filteredData = data.filter(c => c.uniqueid !== currentOrderData.username);
+
+            if (filteredData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-muted">Chỉ tìm thấy nick hiện tại. Hãy tìm nick khác!</td></tr>';
+                return;
+            }
+
+            filteredData.forEach(c => {
+                // Đề phòng lỗi quote (' hoặc ") trong địa chỉ làm hỏng hàm onclick của JS
+                const phoneArg = c.phone || '';
+                const addressArg = c.address || '';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="fw-bold">${c.nickname || ''}</td>
+                        <td class="text-primary">${c.uniqueid || ''}</td>
+                        <td>${c.phone || ''}</td>
+                        <td class="text-start">${c.address || ''}</td>
+                        <td>
+                            <button class="btn btn-sm btn-success fw-bold" 
+                                onclick='executeSyncCustomer(${JSON.stringify(phoneArg)}, ${JSON.stringify(addressArg)})'>
+                                <i class="bi bi-arrow-down-circle"></i> Chọn
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        } catch (err) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-danger">Lỗi kết nối khi tìm kiếm!</td></tr>';
+        }
+    }, 500);
+}
+
+async function executeSyncCustomer(phone, address) {
+    if (!phone && !address) {
+        alert("Khách hàng này chưa có số điện thoại và địa chỉ để lấy thông tin!");
+        return;
+    }
+
+    const confirmMsg = `Hệ thống sẽ đồng bộ thông tin sau vào nick "${currentOrderData.nickname}":\n\n- SĐT: ${phone || 'Trống'}\n- Địa chỉ: ${address || 'Trống'}\n\nBạn có chắc chắn không?`;
+    if (!confirm(confirmMsg)) return;
+
+    const orderId = document.getElementById('currentOrderId').value;
+
+    try {
+        const res = await fetch('/api/order/sync_customer', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                order_id: orderId,
+                phone: phone,
+                address: address
+            })
+        });
+
+        const result = await res.json();
+        if (result.ok) {
+            syncModalObj.hide();
+            // Load lại UI đơn hàng đang mở
+            openOrder(orderId, null);
+            
+            // Hỏi xem có muốn load lại Địa chỉ chuẩn cho ViettelPost không (nếu bạn đang dùng VTP)
+            setTimeout(() => {
+                if (confirm(`Đồng bộ thành công!\nBạn có muốn cập nhật lại "Địa chỉ chuẩn" (Viettel Post) cho SĐT mới này không?`)) {
+                    openAddressModal();
+                }
+            }, 300);
+        } else {
+            alert("Lỗi hệ thống: " + result.error);
+        }
+    } catch (err) {
+        console.error(err);
+        alert("Lỗi kết nối server!");
+    }
+}
+
+
+
+// ====================================================================
+
+// Khởi chạy khi tải trang
+loadOrderList();
+
+</script>
+<script>
+// Tự động load - GIỮ NGUYÊN LOGIC GỐC
+document.addEventListener('DOMContentLoaded', function() {
+    if(typeof loadOrderList === 'function') {
+        loadOrderList();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,408 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Đối soát đơn hàng - Biolinh 2Hand{% endblock %}
+{% block breadcrumb_parent %}Quản lý chính{% endblock %}
+{% block breadcrumb_child %}Đối soát đơn hàng{% endblock %}
+{% block mobile_title %}Đối soát{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<style>
+  /* Fix chống đè Bootstrap nếu có */
+  #doisoat-wrapper .card { border: 1px solid #e2e8f0; }
+  #doisoat-wrapper input[type="date"] { color-scheme: light; }
+  .doisoat-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; font-weight: 600; }
+  .doisoat-table td { font-size: 13.5px; }
+  .badge-success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+  .badge-warning { background: #fef9c3; color: #854d0e; border: 1px solid #fde68a; }
+  .badge-pending { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="doisoat-wrapper" class="space-y-4">
+  <!-- Header -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+    <div>
+      <h2 class="text-[18px] font-bold text-slate-900 flex items-center gap-2"><i class="bi bi-wallet2 text-blue-600"></i> Đối soát doanh thu</h2>
+      <p class="text-[12.5px] text-slate-500 mt-1">Đồng bộ trạng thái giao hàng từ file ViettelPost, duyệt đối soát và tổng kết thực nhận</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <input type="file" id="fileExcel" class="hidden" accept=".xlsx, .xls, .csv" onchange="uploadExcel(this)">
+      <button class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[13px] font-medium flex items-center gap-2 transition shadow-sm" onclick="document.getElementById('fileExcel').click()">
+        <i class="bi bi-file-earmark-spreadsheet"></i> Cập nhật Excel đối soát
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters - Mẫu mới tham khảo - Fix font nhỏ + active rõ -->
+  <style>
+    .quick-filter-btn { font-size: 11px; padding: 4px 10px; border-radius: 9999px; border: 1px solid #e2e8f0; background: white; color: #475569; font-weight: 500; transition: all 0.15s; line-height: 1.2; }
+    .quick-filter-btn:hover { background: #f8fafc; }
+    .quick-filter-btn.active { background: #2563eb !important; color: white !important; border-color: #2563eb !important; }
+    .filter-label { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+    .filter-input { font-size: 11.5px; padding: 5px 10px; border: 1px solid #e2e8f0; border-radius: 10px; }
+    .filter-display { font-size: 10px; padding: 3px 8px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 9999px; color: #64748b; }
+  </style>
+  <div class="bg-white rounded-2xl border border-slate-200 p-3 shadow-sm space-y-3">
+    <!-- Dòng 1: Bộ lọc nhanh + Năm/Tháng -->
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div class="flex items-center gap-1.5 flex-wrap">
+        <span class="filter-label mr-1">Bộ lọc nhanh:</span>
+        <button data-filter="all" class="quick-filter-btn" onclick="setQuickFilter('all')">Tất cả</button>
+        <button data-filter="this_month" class="quick-filter-btn active" onclick="setQuickFilter('this_month')">Tháng này</button>
+        <button data-filter="this_quarter" class="quick-filter-btn" onclick="setQuickFilter('this_quarter')">Quý này</button>
+        <button data-filter="this_year" class="quick-filter-btn" onclick="setQuickFilter('this_year')">Năm nay</button>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <select id="yearSelect" class="filter-input bg-white focus:ring-2 focus:ring-blue-500 outline-none" onchange="onYearMonthChange()"></select>
+        <select id="monthSelect" class="filter-input bg-white focus:ring-2 focus:ring-blue-500 outline-none" onchange="onYearMonthChange()">
+          <option value="1">Tháng 1</option><option value="2">Tháng 2</option><option value="3">Tháng 3</option><option value="4">Tháng 4</option><option value="5">Tháng 5</option><option value="6">Tháng 6</option><option value="7">Tháng 7</option><option value="8">Tháng 8</option><option value="9">Tháng 9</option><option value="10">Tháng 10</option><option value="11">Tháng 11</option><option value="12">Tháng 12</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Dòng 2: Từ ngày - Đến ngày - Nút lọc - Đang xem -->
+    <div class="flex flex-col lg:flex-row lg:items-center gap-3">
+      <div class="flex items-center gap-2 flex-wrap">
+        <label class="filter-label whitespace-nowrap">Từ ngày</label>
+        <div class="flex items-center gap-1.5">
+          <input type="date" id="startDate" class="filter-input focus:ring-2 focus:ring-blue-500 outline-none">
+          <span id="startDateDisplay" class="filter-display">--/--/----</span>
+        </div>
+        <label class="filter-label whitespace-nowrap ml-1">Đến ngày</label>
+        <div class="flex items-center gap-1.5">
+          <input type="date" id="endDate" class="filter-input focus:ring-2 focus:ring-blue-500 outline-none">
+          <span id="endDateDisplay" class="filter-display">--/--/----</span>
+        </div>
+        <button class="w-7 h-7 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center transition" onclick="applyDateFilter()"><i class="bi bi-search" style="font-size:12px"></i></button>
+      </div>
+      <div class="lg:ml-auto">
+        <span class="inline-flex items-center px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-full text-[10.5px] text-slate-600">Đang xem: <strong id="viewingRange" class="ml-1 text-slate-900">Tất cả</strong></span>
+      </div>
+    </div>
+
+    <!-- Dòng 3: Lọc trạng thái + Tìm nhanh -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2.5 border-t border-slate-100">
+      <div>
+        <label class="filter-label">Lọc trạng thái</label>
+        <select id="statusFilter" class="mt-1 w-full filter-input bg-white focus:ring-2 focus:ring-blue-500 outline-none" style="padding:6px 10px; font-size:11.5px;" onchange="filterTable()">
+          <option value="">-- Tất cả trạng thái --</option>
+        </select>
+      </div>
+      <div>
+        <label class="filter-label">Tìm nhanh</label>
+        <div class="mt-1 relative">
+          <span class="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"><i class="bi bi-search" style="font-size:11px"></i></span>
+          <input type="text" id="liveSearchBox" class="w-full pl-7 pr-3 filter-input focus:ring-2 focus:ring-blue-500 outline-none" style="padding:6px 10px 6px 28px;" placeholder="Mã đơn, SĐT, Tên..." onkeyup="filterTable()">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-600/20 relative overflow-hidden">
+      <div class="absolute -right-8 -top-8 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
+      <div class="relative flex justify-between items-center">
+        <div>
+          <div class="text-blue-100 text-[11px] font-semibold uppercase tracking-wide">Tổng Thu Hộ (COD)</div>
+          <div class="text-[22px] font-bold mt-1" id="totalCOD">0 đ</div>
+        </div>
+        <div class="w-10 h-10 bg-white/15 rounded-xl flex items-center justify-center"><i class="bi bi-box-seam text-[18px]"></i></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+      <div class="flex justify-between items-center">
+        <div>
+          <div class="text-slate-500 text-[11px] font-semibold uppercase tracking-wide">Tổng Phí Vận Chuyển</div>
+          <div class="text-[22px] font-bold mt-1 text-red-600" id="totalFee">0 đ</div>
+        </div>
+        <div class="w-10 h-10 bg-red-50 border border-red-100 rounded-xl flex items-center justify-center text-red-600"><i class="bi bi-truck text-[18px]"></i></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm relative overflow-hidden">
+      <div class="flex justify-between items-center">
+        <div>
+          <div class="text-slate-500 text-[11px] font-semibold uppercase tracking-wide">Thực Nhận</div>
+          <div class="text-[22px] font-bold mt-1 text-emerald-600" id="totalNet">0 đ</div>
+        </div>
+        <div class="w-10 h-10 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-center text-emerald-600"><i class="bi bi-cash-coin text-[18px]"></i></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Bar -->
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+    <button class="px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-[13px] font-medium flex items-center gap-2 transition" onclick="approveAllSuccess()">
+      <i class="bi bi-lightning-charge-fill text-amber-400"></i> Hoàn Thành Nhanh (Giao thành công)
+    </button>
+    <div class="px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full text-[12px] font-medium text-slate-700 flex items-center gap-2">
+      <i class="bi bi-list-check text-blue-600"></i> Hiển thị: <span id="rowCount" class="text-red-600 font-bold">0</span> đơn
+      <span class="text-slate-400">|</span>
+      <span id="rowTotalValue" class="text-red-600 font-bold">0</span> đ
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full doisoat-table">
+        <thead class="bg-slate-50 border-b border-slate-200">
+          <tr>
+            <th class="text-left px-4 py-3">Mã Đơn Hàng</th>
+            <th class="text-left px-4 py-3">Tên Khách Hàng</th>
+            <th class="text-left px-4 py-3">ID Khách</th>
+            <th class="text-right px-4 py-3">Tổng Đơn</th>
+            <th class="text-left px-4 py-3">Mã Vận Đơn</th>
+            <th class="text-left px-4 py-3">Trạng Thái</th>
+            <th class="text-center px-4 py-3">Thao Tác</th>
+          </tr>
+        </thead>
+        <tbody id="pendingTableBody" class="divide-y divide-slate-100"></tbody>
+      </table>
+    </div>
+    <div id="emptyState" class="hidden p-10 text-center text-slate-500">
+      <i class="bi bi-inbox text-[32px]"></i>
+      <div class="mt-2 text-[13px]">Không có đơn nào chờ đối soát</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function formatMoney(amount) {
+  return new Intl.NumberFormat('vi-VN').format(amount || 0) + ' đ';
+}
+
+async function loadPendingTable() {
+  const tbody = document.getElementById('pendingTableBody');
+  const emptyState = document.getElementById('emptyState');
+  tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-slate-400 text-[13px]"><i class="bi bi-arrow-clockwise animate-spin mr-2"></i>Đang tải...</td></tr>`;
+  try {
+    const res = await fetch(`/api/doisoat/pending`);
+    if (!res.ok) throw new Error("Lỗi tải bảng: " + res.status);
+    const data = await res.json();
+    
+    if (!data || data.length === 0) {
+      tbody.innerHTML = "";
+      emptyState.classList.remove('hidden');
+      updateStatusDropdown([]);
+      filterTable();
+      return;
+    }
+    emptyState.classList.add('hidden');
+    
+    tbody.innerHTML = data.map(row => `
+      <tr class="order-row hover:bg-slate-50 transition">
+        <td class="px-4 py-3 font-bold text-slate-900 search-target">${row.order_id}</td>
+        <td class="px-4 py-3 text-slate-700 search-target">${row.nickname || ''}</td>
+        <td class="px-4 py-3 search-target"><span class="text-[11px] text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">${row.username || ''}</span></td>
+        <td class="px-4 py-3 text-right font-bold text-blue-600">${formatMoney(row.total_price)}</td>
+        <td class="px-4 py-3 search-target"><code class="text-[11px] bg-slate-100 px-1.5 py-0.5 rounded">${row.tracking_number || ''}</code></td>
+        <td class="px-4 py-3">
+          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border status-label ${row.success === 'Giao thành công' ? 'badge-success' : row.success === 'Đã hủy' || row.success === 'Hủy' ? 'bg-red-50 text-red-700 border-red-200' : 'badge-warning'}">
+            ${row.success || 'Chờ cập nhật'}
+          </span>
+        </td>
+        <td class="px-4 py-3 text-center">
+          <button class="px-3 py-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-full text-[11px] font-medium transition" onclick="approveOrder('${row.order_id}')">
+            <i class="bi bi-check-circle mr-1"></i> Duyệt
+          </button>
+        </td>
+      </tr>
+    `).join('');
+    
+    updateStatusDropdown(data);
+    filterTable(); 
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-red-500 text-[13px]">Không thể tải dữ liệu: ${err.message}</td></tr>`;
+  }
+}
+
+function updateStatusDropdown(data) {
+  const select = document.getElementById('statusFilter');
+  const currentSelection = select.value;
+  const statuses = [...new Set(data.map(item => item.success || 'Chờ cập nhật'))];
+  let options = '<option value="">-- Tất cả trạng thái --</option>';
+  statuses.sort().forEach(status => {
+    const selected = status === currentSelection ? 'selected' : '';
+    options += `<option value="${status}" ${selected}>${status}</option>`;
+  });
+  select.innerHTML = options;
+}
+
+function filterTable() {
+  const searchText = document.getElementById('liveSearchBox').value.toLowerCase();
+  const statusText = document.getElementById('statusFilter').value;
+  const rows = document.querySelectorAll('.order-row');
+  
+  let visibleCount = 0;
+  let visibleTotalValue = 0;
+
+  rows.forEach(row => {
+    const content = row.querySelectorAll('.search-target');
+    const textToSearch = Array.from(content).map(c => c.textContent.toLowerCase()).join(' ');
+    const statusValue = row.querySelector('.status-label')?.textContent.trim() || "";
+
+    const matchSearch = textToSearch.includes(searchText);
+    const matchStatus = statusText === "" || statusValue === statusText;
+
+    if (matchSearch && matchStatus) {
+      row.style.display = "";
+      visibleCount++;
+      const priceCell = row.cells[3].textContent;
+      const priceValue = parseInt(priceCell.replace(/[^0-9]/g, '')) || 0;
+      visibleTotalValue += priceValue;
+    } else {
+      row.style.display = "none";
+    }
+  });
+  
+  document.getElementById('rowCount').innerText = visibleCount;
+  document.getElementById('rowTotalValue').innerText = new Intl.NumberFormat('vi-VN').format(visibleTotalValue);
+}
+
+async function updateSummary() {
+  const start = document.getElementById('startDate').value;
+  const end = document.getElementById('endDate').value;
+  try {
+    const res = await fetch(`/api/doisoat/summary?start=${start}&end=${end}`);
+    if (!res.ok) throw new Error("Lỗi summary");
+    const data = await res.json();
+    document.getElementById('totalNet').innerText = formatMoney(data.revenue);
+    document.getElementById('totalCOD').innerText = formatMoney(data.total_payment);
+    document.getElementById('totalFee').innerText = formatMoney(data.shipping_cost);
+  } catch (err) {
+    console.error("Lỗi cập nhật tổng kết:", err);
+  }
+}
+
+async function approveOrder(orderId) {
+  if (!confirm(`Xác nhận duyệt đối soát đơn ${orderId}?`)) return;
+  try {
+    const res = await fetch('/api/doisoat/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: orderId, mode: 'single' })
+    });
+    const result = await res.json();
+    if (res.ok) {
+      loadPendingTable();
+      updateSummary();
+    } else {
+      alert(result.message || result.error || "Lỗi duyệt đơn");
+    }
+  } catch (err) { alert("Lỗi kết nối: " + err.message); }
+}
+
+async function approveAllSuccess() {
+  if (!confirm("Duyệt toàn bộ đơn có trạng thái 'Giao thành công'? Thao tác này sẽ chuyển các đơn sang đã đối soát.")) return;
+  try {
+    const res = await fetch('/api/doisoat/approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'all_success' })
+    });
+    const result = await res.json();
+    if (res.ok) {
+      alert(result.message || `Đã duyệt ${result.count || 0} đơn`);
+      loadPendingTable();
+      updateSummary();
+    } else {
+      alert(result.error || "Lỗi duyệt nhanh");
+    }
+  } catch (err) { alert("Lỗi kết nối: " + err.message); }
+}
+
+async function uploadExcel(input) {
+  if (!input.files?.length) return;
+  const file = input.files[0];
+  const validExt = ['.xlsx','.xls','.csv'];
+  const ext = '.' + file.name.split('.').pop().toLowerCase();
+  if (!validExt.includes(ext)) {
+    alert("Chỉ hỗ trợ file .xlsx, .xls, .csv");
+    input.value = "";
+    return;
+  }
+  const formData = new FormData();
+  formData.append('file', file);
+  const btn = document.querySelector('button[onclick="document.getElementById(\'fileExcel\').click()"]');
+  const oldText = btn ? btn.innerHTML : "";
+  if (btn) btn.innerHTML = '<i class="bi bi-arrow-clockwise animate-spin"></i> Đang xử lý...';
+  try {
+    const res = await fetch('/api/doisoat/upload_status', { method: 'POST', body: formData });
+    const result = await res.json();
+    if(res.ok) {
+      alert(result.message || `Cập nhật thành công ${result.updated || 0} đơn!`);
+      loadPendingTable();
+      updateSummary();
+    } else {
+      alert(result.error || "Lỗi upload");
+    }
+  } catch(err) { alert("Lỗi upload: " + err.message); }
+  finally { 
+    input.value = ""; 
+    if (btn) btn.innerHTML = oldText;
+  }
+}
+
+// Fix múi giờ: dùng local date thay vì toISOString UTC
+function toLocalISO(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth()+1).padStart(2,'0');
+  const d = String(date.getDate()).padStart(2,'0');
+  return `${y}-${m}-${d}`;
+}
+function toDisplayDate(iso) {
+  if (!iso) return '--/--/----';
+  const [y,m,d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+function updateDateDisplays() {
+  const s = document.getElementById('startDate').value;
+  const e = document.getElementById('endDate').value;
+  document.getElementById('startDateDisplay').innerText = s? toDisplayDate(s) : '--/--/----';
+  document.getElementById('endDateDisplay').innerText = e? toDisplayDate(e) : '--/--/----';
+  document.getElementById('viewingRange').innerText = (!s &&!e)? 'Tất cả' : `${toDisplayDate(s)} - ${toDisplayDate(e)}`;
+}
+function setQuickFilter(type) {
+  const now = new Date();
+  let start, end;
+  if (type === 'all') { start=null; end=null; }
+  else if (type === 'this_month') { start=new Date(now.getFullYear(), now.getMonth(), 1); end=now; }
+  else if (type === 'this_quarter') { const q=Math.floor(now.getMonth()/3); start=new Date(now.getFullYear(), q*3, 1); end=now; }
+  else if (type === 'this_year') { start=new Date(now.getFullYear(),0,1); end=now; }
+  document.getElementById('startDate').value = start? toLocalISO(start) : '';
+  document.getElementById('endDate').value = end? toLocalISO(end) : '';
+  document.querySelectorAll('.quick-filter-btn').forEach(b=>{b.classList.remove('bg-blue-600','border-blue-600','text-white'); b.classList.add('bg-white','border-slate-200','text-slate-600');});
+  const active=document.querySelector(`[data-filter="${type}"]`);
+  if(active){active.classList.add('bg-blue-600','border-blue-600','text-white');}
+  updateDateDisplays(); updateSummary();
+}
+function onYearMonthChange() {
+  const y=parseInt(document.getElementById('yearSelect').value);
+  const m=parseInt(document.getElementById('monthSelect').value);
+  const start=new Date(y,m-1,1); const end=new Date(y,m,0);
+  document.getElementById('startDate').value=toLocalISO(start);
+  document.getElementById('endDate').value=toLocalISO(end);
+  updateDateDisplays(); updateSummary();
+}
+function applyDateFilter(){ updateDateDisplays(); updateSummary(); }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const yearSel=document.getElementById('yearSelect');
+  const now=new Date();
+  for(let y=now.getFullYear()-3; y<=now.getFullYear()+1; y++){
+    const opt=document.createElement('option'); opt.value=y; opt.textContent=`Năm ${y}`;
+    if(y===now.getFullYear()) opt.selected=true; yearSel.appendChild(opt);
+  }
+  document.getElementById('monthSelect').value=now.getMonth()+1;
+  setQuickFilter('this_month'); // mặc định tháng này, đã fix múi giờ
+  document.getElementById('startDate').addEventListener('change', ()=>{updateDateDisplays(); updateSummary();});
+  document.getElementById('endDate').addEventListener('change', ()=>{updateDateDisplays(); updateSummary();});
+  loadPendingTable();
+});
+</script>
+{% endblock %}

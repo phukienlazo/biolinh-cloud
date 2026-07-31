@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Biolinh 2Hand - Admin{% endblock %}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<style>
+  body{font-family:Inter,sans-serif}
+  .sidebar-collapsed .sidebar-text{display:none !important}
+  .sidebar-collapsed .menu-badge{display:none !important}
+  .sidebar-collapsed .cloud-card{display:none !important}
+  .sidebar-collapsed .user-info-text{display:none !important}
+  .scrollbar-thin::-webkit-scrollbar{width:4px}
+  .scrollbar-thin::-webkit-scrollbar-thumb{background:#334155;border-radius:999px}
+  .scrollbar-thin::-webkit-scrollbar-track{background:transparent}
+  .nav-active{
+    background:#2563eb !important;
+    color:white !important;
+    box-shadow:0 4px 12px rgba(37,99,235,.25);
+  }
+  .nav-active-secondary{
+    background:#1e293b !important;
+    color:white !important;
+    border-left:3px solid #3b82f6;
+  }
+</style>
+{% block head %}{% endblock %}
+<!-- FIX CHỐNG MÉO SIDEBAR KHI ORDERS LOAD BOOTSTRAP - ĐẶT SAU block head để luôn thắng -->
+<style id="sidebar-protection">
+  #sidebar{
+    width:280px !important;
+    min-width:280px !important;
+    max-width:280px !important;
+    flex:0 0 280px !important;
+  }
+  #sidebar.sidebar-collapsed{
+    width:72px !important;
+    min-width:72px !important;
+    max-width:72px !important;
+    flex:0 0 72px !important;
+  }
+  #sidebar .flex{ display:flex !important; }
+  #sidebar .flex-col{ flex-direction:column !important; }
+  #sidebar .flex-1{ flex:1 1 0% !important; }
+  #sidebar .items-center{ align-items:center !important; }
+  #sidebar .justify-between{ justify-content:space-between !important; }
+  #sidebar .justify-center{ justify-content:center !important; }
+  #sidebar .shrink-0{ flex-shrink:0 !important; }
+  #sidebar .flex-shrink-0{ flex-shrink:0 !important; }
+  #sidebar .ml-auto{ margin-left:auto !important; }
+  #sidebar .gap-3{ gap:0.75rem !important; }
+  #sidebar .gap-2{ gap:0.5rem !important; }
+  #sidebar .gap-2\.5{ gap:0.625rem !important; }
+  #sidebar .p-5{ padding:1.25rem !important; }
+  #sidebar .p-3{ padding:0.75rem !important; }
+  #sidebar .p-2\.5{ padding:0.625rem !important; }
+  #sidebar .px-3{ padding-left:0.75rem !important; padding-right:0.75rem !important; }
+  #sidebar .py-2{ padding-top:0.5rem !important; padding-bottom:0.5rem !important; }
+  #sidebar .py-2\.5{ padding-top:0.625rem !important; padding-bottom:0.625rem !important; }
+  #sidebar .w-9{ width:2.25rem !important; height:2.25rem !important; }
+  #sidebar .h-9{ height:2.25rem !important; }
+  #sidebar .w-7{ width:1.75rem !important; height:1.75rem !important; }
+  #sidebar .w-6{ width:1.5rem !important; }
+  #sidebar .w-8{ width:2rem !important; height:2rem !important; }
+  #sidebar .rounded-xl{ border-radius:0.75rem !important; }
+  #sidebar .rounded-2xl{ border-radius:1rem !important; }
+  #sidebar .rounded-lg{ border-radius:0.5rem !important; }
+  #sidebar .rounded-full{ border-radius:9999px !important; }
+  #sidebar a{ text-decoration:none !important; }
+  #sidebar .text-\[15px\]{ font-size:15px !important; }
+  #sidebar .text-\[10px\]{ font-size:10px !important; }
+  #sidebar .text-\[13px\]{ font-size:13px !important; }
+  #sidebar .text-\[13\.5px\]{ font-size:13.5px !important; }
+  #sidebar .leading-tight{ line-height:1.25 !important; }
+  /* Đảm bảo logo không bị kéo vào giữa */
+  #sidebar > div:first-child{
+    justify-content:space-between !important;
+    align-items:center !important;
+    display:flex !important;
+  }
+</style>
+</head>
+<body class="bg-[#f8fafc] h-screen overflow-hidden flex">
+{% set cur = request.path %}
+{% set is_orders = cur.startswith('/admin/orders') or cur.startswith('/ql-donhang') or cur.startswith('/donhang') or cur.startswith('/orders') or cur.startswith('/order-details') or '/donhang' in cur or 'ql-donhang' in cur %}
+{% set is_doisoat = 'doisoat' in cur %}
+{% set is_kygui = 'kygui' in cur %}
+{% set is_nhanvien = cur == '/admin' or cur.startswith('/admin/add_employee') or cur.startswith('/admin/edit_employee') or cur.startswith('/admin/attendance') or cur.startswith('/nhanvien') or cur.startswith('/chamcong') or cur.startswith('/employee') or cur.startswith('/admin/pay') or (cur.startswith('/admin') and not ('bangke' in cur or 'baocao' in cur or 'cai-dat' in cur or 'orders' in cur or 'doisoat' in cur or 'kygui' in cur)) %}
+{% set is_bangke = 'bangke' in cur %}
+{% set is_baocao = 'baocao' in cur %}
+{% set is_caidat = 'cai-dat' in cur %}
+
+<!-- Sidebar -->
+<aside id="sidebar" class="bg-[#0f172a] text-slate-300 flex flex-col shrink-0 transition-all duration-300 z-40 fixed md:relative h-full translate-x-[-100%] md:translate-x-0 border-r border-slate-800/50">
+  <div class="p-5 flex items-center justify-between shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-blue-600/20 shrink-0">B</div>
+      <div class="sidebar-text leading-tight">
+        <div class="text-white font-bold tracking-tight text-[15px] whitespace-nowrap">BIOLINH 2HAND</div>
+        <div class="text-[10px] text-slate-400 tracking-[0.15em] font-medium whitespace-nowrap">ADMIN PANEL</div>
+      </div>
+    </div>
+    <button id="collapseBtn" class="hidden md:flex w-7 h-7 rounded-lg bg-slate-800 items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition shrink-0">«</button>
+  </div>
+  
+  <nav class="flex-1 px-3 space-y-1 overflow-y-auto scrollbar-thin py-2">
+    <div class="text-[11px] text-slate-500 font-semibold tracking-widest px-3 py-2 sidebar-text mt-2">QUẢN LÝ CHÍNH</div>
+    
+    <a href="/admin/orders" class="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-[13.5px] {% if is_orders %}nav-active{% else %}hover:bg-slate-800/80 hover:text-white text-slate-400{% endif %}">
+      <span class="w-6 text-center text-[16px] shrink-0"><i class="bi bi-box-seam"></i></span>
+      <span class="sidebar-text font-medium truncate">Quản lý đơn hàng</span>
+      {% if tong_don is defined and tong_don %}
+      <span class="ml-auto sidebar-text menu-badge bg-white/20 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shrink-0">{{ tong_don }}</span>
+      {% elif is_orders %}
+      <span class="ml-auto sidebar-text w-1.5 h-1.5 bg-white rounded-full shrink-0"></span>
+      {% endif %}
+    </a>
+
+    <!--<a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-xl transition text-[13.5px] text-slate-500 cursor-not-allowed">
+      <span class="w-6 text-center text-[16px] shrink-0"><i class="bi bi-people"></i></span>
+      <span class="sidebar-text truncate">Quản lý khách hàng</span>
+      <span class="ml-auto sidebar-text text-[10px] bg-amber-500/15 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full shrink-0">Sắp có</span>
+    </a>-->
+
+    <a href="/admin/doisoat" class="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-[13.5px] {% if is_doisoat %}nav-active-secondary{% else %}hover:bg-slate-800/60 hover:text-slate-200 text-slate-400{% endif %}">
+      <span class="w-6 text-center text-[16px] shrink-0"><i class="bi bi-arrow-left-right"></i></span>
+      <span class="sidebar-text font-medium truncate">Đối soát đơn hàng</span>
+    </a>
+
+    <a href="/admin/kygui" class="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-[13.5px] {% if is_kygui %}nav-active-secondary{% else %}hover:bg-slate-800/60 hover:text-slate-200 text-slate-400{% endif %}">
+      <span class="w-6 text-center text-[16px] shrink-0"><i class="bi bi-box2-heart"></i></span>
+      <span class="sidebar-text font-medium truncate">Quản lý ký gửi</span>
+    </a>
+
+    <a href="/admin" class="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-[13.5px] {% if is_nhanvien %}nav-active{% else %}hover:bg-slate-800/80 hover:text-white text-slate-400{% endif %}">
+      <span class="w-6 text-center text-[16px] shrink-0"><i class="bi bi-person-workspace"></i></span>
+      <span class="sidebar-text font-medium truncate">Quản lý nhân viên</span>
+    </a>
+
+    <div class="text-[11px] text-slate-500 font-semibold tracking-widest px-3 py-2 mt-6 sidebar-text">BÁO CÁO</div>
+    
+    <a href="/admin/bangke" class="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-[13.5px] {% if is_bangke %}nav-active-secondary{% else %}hover:bg-slate-800/60 hover:text-slate-200 text-slate-400{% endif %}">
+      <span class="w-6 text-center text-[16px] shrink-0"><i class="bi bi-journal-text"></i></span>
+      <span class="sidebar-text font-medium truncate">Bảng kê mua hàng</span>
+    </a>
+
+    <a href="/admin/baocao" class="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-[13.5px] {% if is_baocao %}nav-active-secondary{% else %}hover:bg-slate-800/60 hover:text-slate-200 text-slate-400{% endif %}">
+      <span class="w-6 text-center text-[16px] shrink-0"><i class="bi bi-bar-chart-line"></i></span>
+      <span class="sidebar-text font-medium truncate">Báo cáo tổng kết</span>
+    </a>
+
+    <a href="/admin/cai-dat" class="group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-[13.5px] {% if is_caidat %}nav-active-secondary{% else %}hover:bg-slate-800/60 hover:text-slate-200 text-slate-400{% endif %}">
+      <span class="w-6 text-center text-[16px] shrink-0"><i class="bi bi-gear"></i></span>
+      <span class="sidebar-text font-medium truncate">Cài đặt</span>
+    </a>
+
+    <div class="mt-8 p-4 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 sidebar-text cloud-card relative overflow-hidden">
+      <div class="absolute -right-6 -top-6 w-20 h-20 bg-white/10 rounded-full blur-xl"></div>
+      <div class="relative">
+        <div class="flex items-center gap-2 text-white text-[13px] font-semibold"><i class="bi bi-cloud-check"></i> Cloud Mode</div>
+        <div class="text-blue-100 text-[11.5px] mt-1.5 leading-relaxed">Đang chạy trên Render, không cần mở máy ở nhà nữa.</div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="p-3 border-t border-slate-800/80 shrink-0">
+    <div class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:bg-slate-800 transition">
+      <div class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow">{{ session.hovaten[0] if session.hovaten else 'Q' }}</div>
+      <div class="flex-1 min-w-0 sidebar-text user-info-text">
+        <div class="text-white text-[13px] font-medium truncate leading-tight">{{ session.hovaten or 'Người Quản Lý' }}</div>
+        <div class="text-slate-400 text-[11px] flex items-center gap-1.5 mt-0.5"><span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>{{ session.role or 'QTV' }} • Online</div>
+      </div>
+      <a href="{{ url_for('logout') }}" class="sidebar-text w-8 h-8 rounded-lg hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition shrink-0" title="Đăng xuất"><i class="bi bi-box-arrow-right text-[14px]"></i></a>
+    </div>
+  </div>
+</aside>
+
+<div id="overlay" class="fixed inset-0 bg-black/60 z-30 hidden md:hidden backdrop-blur-sm"></div>
+
+<div class="flex-1 flex flex-col min-w-0 bg-[#f8fafc]">
+  <header class="h-[64px] bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-6 shrink-0 sticky top-0 z-20">
+    <div class="flex items-center gap-3">
+      <button id="mobileMenu" class="md:hidden w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition"><i class="bi bi-list text-[18px]"></i></button>
+      <div class="hidden md:flex items-center gap-2 text-[13px]">
+        <span class="text-slate-500">{% block breadcrumb_parent %}Tổng quan{% endblock %}</span><span class="text-slate-300">/</span><span class="text-slate-900 font-semibold">{% block breadcrumb_child %}Dashboard{% endblock %}</span>
+      </div>
+      <h1 class="md:hidden font-semibold text-slate-900 text-[15px]">{% block mobile_title %}Dashboard{% endblock %}</h1>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-[11.5px] text-emerald-700 font-medium">
+        <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Cloud: Đã đồng bộ
+      </div>
+      <div class="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center relative hover:bg-slate-50 cursor-pointer transition">
+        <i class="bi bi-bell text-[16px] text-slate-600"></i><span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
+      </div>
+      <div class="hidden md:block text-right leading-tight">
+        <div class="text-[13px] font-medium text-slate-900" id="clock">--:-- - --/--/----</div>
+        <div class="text-[10px] text-slate-500">Asia/Ho_Chi_Minh</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 overflow-auto p-4 md:p-6">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="space-y-2 mb-4">
+          {% for category, message in messages %}
+            <div class="px-4 py-3 rounded-xl text-[13px] flex items-center gap-2.5 border {% if category=='success' %}bg-emerald-50 text-emerald-700 border-emerald-200{% elif category=='danger' %}bg-red-50 text-red-700 border-red-200{% elif category=='warning' %}bg-amber-50 text-amber-700 border-amber-200{% else %}bg-blue-50 text-blue-700 border-blue-200{% endif %}">
+              <i class="bi {% if category=='success' %}bi-check-circle{% elif category=='danger' %}bi-exclamation-triangle{% else %}bi-info-circle{% endif %} text-[14px]"></i> {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<script>
+const sidebar=document.getElementById('sidebar'),overlay=document.getElementById('overlay'),mobileMenu=document.getElementById('mobileMenu'),collapseBtn=document.getElementById('collapseBtn');
+let collapsed=false;
+function openMobile(){sidebar.classList.remove('translate-x-[-100%]');overlay.classList.remove('hidden');}
+function closeMobile(){sidebar.classList.add('translate-x-[-100%]');overlay.classList.add('hidden');}
+mobileMenu?.addEventListener('click',openMobile);
+overlay?.addEventListener('click',closeMobile);
+collapseBtn?.addEventListener('click',()=>{
+  collapsed=!collapsed;
+  if(collapsed){
+    sidebar.classList.add('sidebar-collapsed');
+    collapseBtn.innerHTML='<i class="bi bi-chevron-right"></i>';
+  }else{
+    sidebar.classList.remove('sidebar-collapsed');
+    collapseBtn.innerHTML='«';
+  }
+});
+function updateClock(){
+  const now=new Date();
+  const opt={timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit'};
+  const dateOpt={timeZone:'Asia/Ho_Chi_Minh',day:'2-digit',month:'2-digit',year:'numeric'};
+  try{
+    const time=now.toLocaleTimeString('vi-VN',opt);
+    const date=now.toLocaleDateString('vi-VN',dateOpt);
+    document.getElementById('clock').textContent=time+' - '+date;
+  }catch(e){}
+}
+setInterval(updateClock,1000);updateClock();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QUẢN LÝ ĐƠN HÀNG - BIOLINH 2HAND</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #64748b;
+            --bg-color: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --border-color: #e2e8f0;
+            --danger: #ef4444;
+        }
+        body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; margin: 0; padding: 15px; background-color: var(--bg-color); color: var(--text-main); }
+        .header { text-align: center; margin-bottom: 20px; }
+        .header h1 { font-size: 1.4rem; color: var(--primary-color); margin: 0; text-transform: uppercase; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .search-container { margin-bottom: 15px; }
+        #searchInput { width: 100%; padding: 12px 16px; border: 2px solid var(--border-color); border-radius: 12px; font-size: 16px; outline: none; box-sizing: border-box; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        #searchInput:focus { border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1); }
+        .stats-bar { display:flex; gap:10px; margin-bottom:12px; font-size:0.85rem; flex-wrap:wrap; }
+        .stat-chip { background:white; border:1px solid var(--border-color); padding:6px 12px; border-radius:20px; }
+        .stat-chip.danger { background:#fef2f2; border-color:#fecaca; color:#991b1b; }
+        .table-card { background: var(--card-bg); border-radius:12px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); overflow:hidden; }
+        table { width:100%; border-collapse:collapse; }
+        th { background:#f1f5f9; color:var(--secondary-color); padding:12px; text-align:left; font-size:0.8rem; text-transform:uppercase; border-bottom:2px solid var(--border-color); }
+        td { padding:12px; border-bottom:1px solid var(--border-color); cursor:pointer; }
+        tr:hover td { background:#f8fafc; }
+        .id-badge { background:#dbeafe; color:#1e40af; padding:4px 8px; border-radius:6px; font-weight:bold; font-size:0.8rem; }
+        .price-cell { text-align:right; font-weight:600; color:#e11d48; white-space:nowrap; }
+        tr.row-warning { outline:2px solid var(--danger); outline-offset:-2px; background:#fef2f2; }
+        tr.row-warning td { background:#fef2f2 !important; border-bottom:1px solid #fecaca; }
+        tr.row-warning:hover td { background:#fee2e2 !important; }
+        tr.row-warning td:first-child { border-left:3px solid var(--danger); }
+        tr.row-warning td:last-child { border-right:3px solid var(--danger); }
+        .warn-badge { display:inline-block; background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; font-size:0.65rem; padding:2px 6px; border-radius:10px; margin-left:6px; font-weight:700; }
+        /* Mobile: chỉ hiện Mã Đơn + Nickname */
+        @media (max-width: 700px) {
+            th:nth-child(3), td:nth-child(3),
+            th:nth-child(4), td:nth-child(4) {
+                display:none;
+            }
+            th:nth-child(2), td:nth-child(2) {
+                width: 65%;
+            }
+            .container { padding: 0 5px; }
+        }
+        .modal { display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(15,23,42,0.6); backdrop-filter:blur(4px); }
+        .modal-content { background:#fff; margin:5% auto; width:92%; max-width:450px; border-radius:20px; position:relative; animation:modalPop 0.3s cubic-bezier(0.34,1.56,0.64,1); overflow:hidden; }
+        @keyframes modalPop { from{transform:scale(0.9); opacity:0} to{transform:scale(1); opacity:1} }
+        .modal-header { padding:20px; background:var(--primary-color); color:white; display:flex; justify-content:space-between; align-items:center; }
+        .modal-header h2 { margin:0; font-size:1.1rem; }
+        .close-btn { font-size:24px; cursor:pointer; }
+        .modal-body { padding:20px; max-height:75vh; overflow-y:auto; }
+        .info-card { background:#f8fafc; border:1px solid var(--border-color); border-radius:12px; padding:15px; margin-bottom:20px; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+        .info-label { font-size:0.7rem; color:var(--secondary-color); text-transform:uppercase; display:block; margin-bottom:2px; }
+        .info-value { font-weight:600; font-size:0.95rem; }
+        .price-total { grid-column:span 2; border-top:1px dashed var(--border-color); padding-top:10px; color:#e11d48; font-size:1.2rem; font-weight:800; }
+        .detail-list-table { width:100%; font-size:0.9rem; }
+        .detail-list-table th { background:transparent; border-bottom:1px solid var(--border-color); padding:8px 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Biolinh 2Hand</h1>
+        <div style="font-size:0.8rem; color:var(--secondary-color);">HỆ THỐNG QUẢN LÝ ĐƠN HÀNG</div>
+    </div>
+    <div class="container">
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="Tìm kiếm tên, ID, mã đơn...">
+        </div>
+        <div class="stats-bar">
+            <div class="stat-chip">Tổng đơn Đang Dồn: <strong>{{ data|length }}</strong></div>
+            <div class="stat-chip danger" id="warnCountChip" style="display:none">Đơn dư tiền cọc: <strong id="warnCount">0</strong></div>
+        </div>
+        <div class="table-card">
+            <table id="ordersTable">
+                <thead>
+                    <tr>
+                        <th width="100">Mã Đơn</th>
+                        <th>Nick Tiktok</th>
+                        <th>ID Tiktok</th>
+                        <th style="text-align:right">Tổng Đơn</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in data %}
+                    <tr onclick="loadDetails('{{ row.order_id }}')" class="{% if row.is_warning %}row-warning{% endif %}" title="{% if row.is_warning %}Khách này dư cọc: {{ row.balance }} (price - deposit){% endif %}">
+                        <td><span class="id-badge">{{ row.order_id }}</span></td>
+                        <td><strong>{{ row.nickname }}</strong>{% if row.is_warning %}<span class="warn-badge">DƯ CỌC</span>{% endif %}</td>
+                        <td style="color:var(--secondary-color);">@{{ row.username }}</td>
+                        <td class="price-cell">{{ "{:,.0f}".format(row.price) }} đ</td>
+                    </tr>
+                    {% endfor %}
+                    {% if data|length == 0 %}
+                    <tr><td colspan="4" style="text-align:center; padding:30px; color:#64748b">Không có đơn nào ở trạng thái "Đang Dồn"</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div style="margin-top:10px; font-size:0.75rem; color:#64748b">
+            * Viền đỏ cảnh báo khi tổng tiền cọc của khách hàng thừa quá nhiều, chưa thể đi đơn được, nên chưa cần làm vội khi chưa có yêu cầu
+        </div>
+    </div>
+    <div id="orderModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Chi tiết đơn hàng</h2>
+                <span class="close-btn" onclick="closeModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="info-card">
+                    <div><span class="info-label">Mã đơn</span><span class="info-value" id="m_order_id">-</span></div>
+                    <div><span class="info-label">Số lượng SP</span><span class="info-value" id="m_total_items">-</span></div>
+                    <div><span class="info-label">Nickname</span><span class="info-value" id="m_nickname">-</span></div>
+                    <div><span class="info-label">ID Tiktok</span><span class="info-value" id="m_username">-</span></div>
+                    <div class="price-total"><span class="info-label">Tổng thanh toán</span><span id="m_total_price">0</span> <small>VNĐ</small></div>
+                </div>
+                <table class="detail-list-table">
+                    <thead><tr><th align="left">STT</th><th align="right">Giá từng sản phẩm</th></tr></thead>
+                    <tbody id="m_order_details"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script>
+        const modal = document.getElementById("orderModal");
+        function closeModal(){ modal.style.display="none"; }
+        window.onclick = function(e){ if(e.target==modal) closeModal(); }
+        function loadDetails(orderId){
+            modal.style.display="block";
+            fetch(`/order-details/${orderId}`).then(r=>r.json()).then(data=>{
+                document.getElementById('m_order_id').innerText=data.order_id;
+                document.getElementById('m_nickname').innerText=data.nickname;
+                document.getElementById('m_username').innerText=data.username;
+                document.getElementById('m_total_items').innerText=data.total_items;
+                const cleanTotal=(data.total_price||"0").toString().replace(/,/g,'');
+                document.getElementById('m_total_price').innerText=Number(cleanTotal).toLocaleString('vi-VN');
+                const tb=document.getElementById('m_order_details'); tb.innerHTML='';
+                (data.prices||[]).forEach((price,i)=>{
+                    const raw=Array.isArray(price)?price[0]:price;
+                    const cp=(raw||"0").toString().replace(/,/g,'');
+                    tb.innerHTML+=`<tr><td style="padding:10px 0; border-bottom:1px solid #f1f5f9;">#${i+1}</td><td align="right" style="font-weight:500;">${Number(cp).toLocaleString('vi-VN')} đ</td></tr>`;
+                });
+            }).catch(()=>alert("Lỗi kết nối dữ liệu!"));
+        }
+        document.getElementById("searchInput").addEventListener("keyup", function(){
+            const kw=this.value.toLowerCase().trim();
+            document.querySelectorAll("#ordersTable tbody tr").forEach(row=>{
+                row.style.display=row.innerText.toLowerCase().includes(kw)?"":"none";
+            });
+        });
+        (function(){
+            const warns=document.querySelectorAll('tr.row-warning');
+            if(warns.length>0){
+                document.getElementById('warnCount').innerText=warns.length;
+                document.getElementById('warnCountChip').style.display='inline-block';
+            }
+        })();
+    </script>
+</body>
+</html>

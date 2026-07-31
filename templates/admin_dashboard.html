@@ -1,0 +1,159 @@
+{% extends "admin_base.html" %}
+{% block title %}Quản lý nhân viên - Biolinh 2Hand{% endblock %}
+{% block breadcrumb_parent %}Quản lý nhân viên{% endblock %}
+{% block breadcrumb_child %}Danh sách{% endblock %}
+{% block mobile_title %}Quản lý nhân viên{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <h2 class="text-xl font-bold text-slate-900">Danh sách nhân viên</h2>
+      <p class="text-sm text-slate-500 mt-1">Quản lý chấm công, tính lương theo 26 công/tháng • {{ employees|length }} nhân viên</p>
+    </div>
+    <button onclick="document.getElementById('addEmployeeForm').classList.toggle('hidden')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm shadow-blue-600/20 flex items-center gap-2 w-fit transition">
+      <i class="bi bi-person-plus"></i> Thêm nhân viên mới
+    </button>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+      <div class="text-[11px] tracking-widest text-slate-500 font-semibold">TỔNG NHÂN VIÊN</div>
+      <div class="text-2xl font-bold mt-2 text-slate-900">{{ employees|length }}</div>
+      <div class="text-xs text-emerald-600 mt-1 flex items-center gap-1"><i class="bi bi-arrow-up-short"></i> Đang hoạt động</div>
+    </div>
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+      <div class="text-[11px] tracking-widest text-slate-500 font-semibold">TỔNG CÔNG THÁNG</div>
+      <div class="text-2xl font-bold mt-2 text-slate-900">{{ "%.1f"|format(employees|sum(attribute='tong_cong') if employees else 0) }}</div>
+      <div class="text-xs text-slate-500 mt-1">công / {{ employees|length * 26 if employees else 0 }} định mức</div>
+    </div>
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+      <div class="text-[11px] tracking-widest text-slate-500 font-semibold">LƯƠNG PHẢI TRẢ</div>
+      <div class="text-2xl font-bold mt-2 text-slate-900">{{ "{:,.0f}".format(employees|sum(attribute='thuc_nhan') if employees else 0) }}₫</div>
+      <div class="text-xs text-amber-600 mt-1">Chưa thanh toán</div>
+    </div>
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+      <div class="text-[11px] tracking-widest text-slate-500 font-semibold">GIỜ HIỆN TẠI (VN)</div>
+      <div class="text-2xl font-bold mt-2 text-slate-900" id="liveTime">--:--</div>
+      <div class="text-xs text-slate-500 mt-1">Ca chiều: 13:30 - 17:30</div>
+    </div>
+  </div>
+
+  <div id="addEmployeeForm" class="hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+    <h5 class="font-bold text-slate-900 mb-4 flex items-center gap-2"><i class="bi bi-person-gear text-blue-600"></i> Tạo tài khoản nhân sự mới</h5>
+    <form action="{{ url_for('add_employee') }}" method="POST" class="grid grid-cols-1 md:grid-cols-12 gap-4">
+      <div class="md:col-span-3">
+        <label class="text-xs font-semibold text-slate-600 tracking-wide">USERNAME</label>
+        <input type="text" name="username" class="mt-1 w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+      </div>
+      <div class="md:col-span-3">
+        <label class="text-xs font-semibold text-slate-600 tracking-wide">MẬT KHẨU</label>
+        <input type="password" name="password" class="mt-1 w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+      </div>
+      <div class="md:col-span-3">
+        <label class="text-xs font-semibold text-slate-600 tracking-wide">HỌ VÀ TÊN</label>
+        <input type="text" name="hovaten" class="mt-1 w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+      </div>
+      <div class="md:col-span-3">
+        <label class="text-xs font-semibold text-slate-600 tracking-wide">CHỨC DANH</label>
+        <select name="chucdanh" class="mt-1 w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none">
+          <option value="Nhân Viên">Nhân Viên</option>
+          <option value="QTV">Quản Trị Viên (QTV)</option>
+        </select>
+      </div>
+      <div class="md:col-span-3">
+        <label class="text-xs font-semibold text-slate-600 tracking-wide">LƯƠNG 1 THÁNG (26 CÔNG)</label>
+        <input type="number" step="any" name="luong" class="mt-1 w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="VNĐ" required>
+      </div>
+      <div class="md:col-span-12 text-right">
+        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-sm font-medium"><i class="bi bi-check-lg"></i> Tạo tài khoản</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-100">
+      <div class="flex items-center gap-2">
+        <div class="relative">
+          <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+          <input id="searchEmp" placeholder="Tìm tên, username..." class="pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm w-72 outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <button class="px-3 py-2 border border-slate-200 rounded-xl text-sm hover:bg-slate-50"><i class="bi bi-funnel"></i> Lọc</button>
+        <button class="px-3 py-2 border border-slate-200 rounded-xl text-sm hover:bg-slate-50"><i class="bi bi-download"></i> Xuất Excel</button>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 text-[11px] tracking-widest text-slate-500 border-b border-slate-200">
+          <tr>
+            <th class="text-left font-semibold px-4 py-3">NHÂN VIÊN</th>
+            <th class="text-left font-semibold px-4 py-3">LƯƠNG THÁNG</th>
+            <th class="text-left font-semibold px-4 py-3">CÔNG</th>
+            <th class="text-left font-semibold px-4 py-3">THU NHẬP ƯỚC TÍNH</th>
+            <th class="text-left font-semibold px-4 py-3">PHÁT SINH</th>
+            <th class="text-left font-semibold px-4 py-3">THỰC NHẬN</th>
+            <th class="text-right font-semibold px-4 py-3">HÀNH ĐỘNG</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100" id="empTableBody">
+          {% if not employees %}
+            <tr><td colspan="7" class="text-center py-12 text-slate-400"><div class="text-3xl mb-2">👤</div>Chưa có nhân sự nào trong hệ thống.</td></tr>
+          {% else %}
+            {% for emp in employees %}
+            <tr class="hover:bg-slate-50/80 transition group">
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xs shadow-sm">{{ emp.hovaten[0] }}</div>
+                  <div>
+                    <div class="font-semibold text-slate-900 group-hover:text-blue-600 transition">{{ emp.hovaten }}</div>
+                    <div class="text-xs text-slate-500 flex items-center gap-1.5"><code class="px-1.5 py-0.5 bg-slate-100 rounded text-[11px]">{{ emp.username }}</code> <span class="px-1.5 py-0.5 bg-slate-100 rounded-full text-[10px]">{{ emp.chucdanh }}</span></div>
+                  </div>
+                </div>
+              </td>
+              <td class="px-4 py-3 font-medium text-slate-700">{{ "{:,.0f}".format(emp.luong) }}₫</td>
+              <td class="px-4 py-3"><span class="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-xs font-semibold">{{ emp.tong_cong }} công</span></td>
+              <td class="px-4 py-3 text-slate-600">{{ "{:,.0f}".format(emp.thu_nhap_uoc_tinh) }}₫</td>
+              <td class="px-4 py-3 font-bold {% if emp.tong_phat_sinh >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">{{ "{:+,.0f}".format(emp.tong_phat_sinh) }}₫</td>
+              <td class="px-4 py-3"><span class="font-bold text-slate-900 text-[15px]">{{ "{:,.0f}".format(emp.thuc_nhan) }}₫</span></td>
+              <td class="px-4 py-3 text-right">
+                <div class="flex items-center justify-end gap-1">
+                  <a href="{{ url_for('attendance_log', emp_id=emp.id) }}" class="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-900 hover:text-white transition" title="Chấm công"><i class="bi bi-calendar-check text-xs"></i></a>
+                  <a href="{{ url_for('edit_employee', emp_id=emp.id) }}" class="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-blue-600 hover:text-white transition" title="Quản lý"><i class="bi bi-pencil text-xs"></i></a>
+                  <a href="{{ url_for('delete_employee', emp_id=emp.id) }}" onclick="return confirm('Bạn có chắc chắn muốn xóa nhân viên này?')" class="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-red-600 hover:text-white transition" title="Xóa"><i class="bi bi-trash text-xs"></i></a>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    <div class="p-3 bg-slate-50 border-t text-xs text-slate-500 flex justify-between">
+      <span>Hiển thị {{ employees|length }} nhân viên</span>
+      <span class="flex items-center gap-1"><span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Dữ liệu real-time từ nv.db</span>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('searchEmp')?.addEventListener('input', function(e){
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('#empTableBody tr').forEach(tr=>{
+    const txt = tr.innerText.toLowerCase();
+    tr.style.display = txt.includes(q) ? '' : 'none';
+  });
+});
+function updateLiveTime(){
+  const now=new Date();
+  try{
+    const t=now.toLocaleTimeString('vi-VN',{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    document.getElementById('liveTime').textContent=t;
+  }catch(e){}
+}
+setInterval(updateLiveTime,1000);updateLiveTime();
+</script>
+{% endblock %}

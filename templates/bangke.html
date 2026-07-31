@@ -1,0 +1,226 @@
+
+{% extends "admin_base.html" %}
+{% block title %}Bảng kê mua hàng - Biolinh 2Hand{% endblock %}
+{% block breadcrumb_parent %}Kế toán{% endblock %}
+{% block breadcrumb_child %}Bảng kê mua hàng{% endblock %}
+{% block mobile_title %}Bảng kê mua hàng{% endblock %}
+
+{% block head %}
+<style>
+  #bangkeTable th, #bangkeTable td { white-space: nowrap; }
+  #bangkeTable td.wrap { white-space: normal; word-break: break-word; max-width: 180px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+  <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+    <div>
+      <h2 class="text-[20px] font-bold text-slate-900 flex items-center gap-2"><i class="bi bi-receipt-cutoff text-blue-600"></i> Bảng kê mua hàng (01/TNDN)</h2>
+      <p class="text-[12px] text-slate-500 mt-1">Lưu thông tin người bán, hàng hóa mua vào không có hóa đơn - Xuất PDF mẫu 01/TNDN</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button onclick="openModal()" class="h-10 px-4 bg-blue-600 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-700 flex items-center gap-2"><i class="bi bi-plus-lg"></i> Thêm dòng mới</button>
+      <button onclick="exportPDF()" class="h-10 px-4 bg-red-600 text-white rounded-xl text-[13px] font-semibold hover:bg-red-700 flex items-center gap-2"><i class="bi bi-file-earmark-pdf"></i> Xuất PDF</button>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+    <div class="flex flex-col lg:flex-row gap-3">
+      <div class="flex items-center gap-2 flex-1">
+        <input type="date" id="filterFrom" class="h-10 px-3 border border-slate-200 rounded-xl text-[13px]">
+        <span id="filterFromDisplay" class="text-[11px] text-slate-500 bg-slate-50 border px-2 py-1 rounded-full">dd/mm/yyyy</span>
+        <input type="date" id="filterTo" class="h-10 px-3 border border-slate-200 rounded-xl text-[13px]">
+        <span id="filterToDisplay" class="text-[11px] text-slate-500 bg-slate-50 border px-2 py-1 rounded-full">dd/mm/yyyy</span>
+        <button onclick="loadData()" class="h-10 w-10 bg-slate-900 text-white rounded-xl flex items-center justify-center"><i class="bi bi-search"></i></button>
+      </div>
+      <div class="relative flex-1">
+        <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+        <input id="searchInput" placeholder="Tìm người bán, hàng hóa, CCCD, SĐT..." class="w-full pl-10 pr-4 h-10 bg-slate-50 border border-slate-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+      <div class="text-[12px] px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl text-slate-700">Tổng: <b id="tongTien" class="text-slate-900">0₫</b> / <b id="tongDong">0</b> dòng</div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-[12px]" id="bangkeTable">
+        <thead class="bg-slate-50 text-[11px] tracking-widest text-slate-500">
+          <tr>
+            <th class="px-3 py-2.5 text-center">STT</th>
+            <th class="px-3 py-2.5 text-left">Ngày mua</th>
+            <th class="px-3 py-2.5 text-left">Người bán</th>
+            <th class="px-3 py-2.5 text-left">Địa chỉ / CCCD / ĐT</th>
+            <th class="px-3 py-2.5 text-left">Tên hàng hóa</th>
+            <th class="px-3 py-2.5 text-center">SL</th>
+            <th class="px-3 py-2.5 text-right">Đơn giá</th>
+            <th class="px-3 py-2.5 text-right">Thành tiền</th>
+            <th class="px-3 py-2.5 text-center">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody id="bangkeBody" class="divide-y divide-slate-100">
+          <tr><td colspan="9" class="text-center py-10 text-slate-400">Đang tải...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div id="bangkeModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold text-[16px]" id="modalTitle">Thêm dòng bảng kê</h3>
+      <button onclick="closeModal()" class="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div><label class="text-[11px] font-semibold text-slate-500">NGÀY MUA *</label><input id="f_ngay_mua" type="date" class="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px]"></div>
+      <div><label class="text-[11px] font-semibold text-slate-500">TÊN NGƯỜI BÁN *</label><input id="f_ten_nguoi_ban" placeholder="Nguyễn Văn A" class="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px]"></div>
+      <div class="col-span-2"><label class="text-[11px] font-semibold text-slate-500">ĐỊA CHỈ</label><input id="f_dia_chi" placeholder="Tổ 34, phường..." class="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px]"></div>
+      <div><label class="text-[11px] font-semibold text-slate-500">CCCD</label><input id="f_cccd" placeholder="019095..." class="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px]"></div>
+      <div><label class="text-[11px] font-semibold text-slate-500">ĐIỆN THOẠI</label><input id="f_dien_thoai" placeholder="09..." class="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px]"></div>
+      <div class="col-span-2"><label class="text-[11px] font-semibold text-slate-500">TÊN HÀNG HÓA *</label><input id="f_ten_hang_hoa" placeholder="Quần áo cũ, túi xách..." class="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px]"></div>
+      <div><label class="text-[11px] font-semibold text-slate-500">SỐ LƯỢNG</label><input id="f_so_luong" type="number" value="1" class="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px]"></div>
+      <div><label class="text-[11px] font-semibold text-slate-500">ĐƠN GIÁ</label><input id="f_don_gia" type="number" placeholder="50000" class="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px]"></div>
+      <div><label class="text-[11px] font-semibold text-slate-500">THÀNH TIỀN (auto = SL * ĐG nếu để trống)</label><input id="f_thanh_toan" type="number" class="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px] bg-slate-50"></div>
+      <div><label class="text-[11px] font-semibold text-slate-500">GHI CHÚ</label><input id="f_ghi_chu" placeholder="Mua lẻ..." class="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px]"></div>
+    </div>
+    <input type="hidden" id="f_id">
+    <div class="flex gap-2 mt-6"><button onclick="closeModal()" class="flex-1 py-2.5 border border-slate-200 rounded-xl text-[13px]">Hủy</button><button onclick="saveData()" class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-[13px] font-semibold">Lưu</button></div>
+  </div>
+</div>
+
+<script>
+
+function fmt(n){ return (Number(n)||0).toLocaleString('vi-VN')+'₫'; }
+function fmtDDMMYYYY(iso){
+  if(!iso) return '';
+  iso = String(iso).trim();
+  // Xử lý yyyy-mm-dd hoặc yyyy-mm-ddTHH:MM
+  if(iso.includes('T')) iso = iso.split('T')[0];
+  if(iso.includes('-')){
+    const p = iso.split('-');
+    if(p.length===3){
+      if(p[0].length===4) return `${p[2]}/${p[1]}/${p[0]}`; // yyyy-mm-dd -> dd/mm/yyyy
+      return `${p[0]}/${p[1]}/${p[2]}`.replace(/-/g,'/');
+    }
+  }
+  if(iso.includes('/')) return iso;
+  return iso;
+}
+function fmtDateDisplay(iso){ return fmtDDMMYYYY(iso); }
+
+function fmtNum(n){ return (Number(n)||0).toLocaleString('vi-VN'); }
+let cacheData = [];
+async function loadData(){
+  const from = document.getElementById('filterFrom').value;
+  const to = document.getElementById('filterTo').value;
+  const q = document.getElementById('searchInput').value.trim();
+  const params = new URLSearchParams();
+  if(from) params.append('from', from);
+  if(to) params.append('to', to);
+  if(q) params.append('q', q);
+  
+  const fd = document.getElementById('filterFrom').value;
+  const td = document.getElementById('filterTo').value;
+  const fdd = document.getElementById('filterFromDisplay'); if(fdd) fdd.textContent = fd ? fmtDDMMYYYY(fd) : 'dd/mm/yyyy';
+  const tdd = document.getElementById('filterToDisplay'); if(tdd) tdd.textContent = td ? fmtDDMMYYYY(td) : 'dd/mm/yyyy';
+  document.getElementById('bangkeBody').innerHTML = '<tr><td colspan="9" class="text-center py-10 text-slate-400">Đang tải...</td></tr>';
+  try{
+    const res = await fetch('/api/bangke?'+params.toString());
+    const data = await res.json();
+    cacheData = data.data || [];
+    renderTable(cacheData);
+    document.getElementById('tongTien').textContent = fmt(data.tong||0);
+    document.getElementById('tongDong').textContent = data.count||0;
+  }catch(e){
+    document.getElementById('bangkeBody').innerHTML = '<tr><td colspan="9" class="text-center py-10 text-red-400">Lỗi tải dữ liệu</td></tr>';
+  }
+}
+function renderTable(list){
+  const tbody = document.getElementById('bangkeBody');
+  if(list.length===0){ tbody.innerHTML='<tr><td colspan="9" class="text-center py-10 text-slate-400">Không có dữ liệu</td></tr>'; return; }
+  let html='';
+  list.forEach((r, idx)=>{
+    html+=`<tr class="hover:bg-slate-50">
+      <td class="px-3 py-2.5 text-center">${idx+1}</td>
+      <td class="px-3 py-2.5">${fmtDDMMYYYY(r.ngay_mua)||''}</td>
+      <td class="px-3 py-2.5 font-bold text-slate-900">${r.ten_nguoi_ban||''}</td>
+      <td class="px-3 py-2.5 text-[11px] leading-tight"><div>${r.dia_chi||''}</div><div class="text-slate-500">${r.cccd||''} ${r.dien_thoai?' - '+r.dien_thoai:''}</div></td>
+      <td class="px-3 py-2.5 wrap font-medium">${r.ten_hang_hoa||''}</td>
+      <td class="px-3 py-2.5 text-center">${r.so_luong||0}</td>
+      <td class="px-3 py-2.5 text-right">${fmtNum(r.don_gia)}</td>
+      <td class="px-3 py-2.5 text-right font-bold text-emerald-700">${fmt(r.thanh_toan)}</td>
+      <td class="px-3 py-2.5 text-center"><div class="flex items-center justify-center gap-1"><button onclick="editItem(${r.id})" class="w-7 h-7 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"><i class="bi bi-pencil"></i></button><button onclick="deleteItem(${r.id})" class="w-7 h-7 bg-red-50 text-red-600 rounded-lg hover:bg-red-100"><i class="bi bi-trash"></i></button></div></td>
+    </tr>`;
+  });
+  tbody.innerHTML=html;
+}
+function openModal(){ document.getElementById('bangkeModal').classList.remove('hidden'); document.getElementById('modalTitle').textContent='Thêm dòng bảng kê'; document.getElementById('f_id').value=''; document.getElementById('f_ngay_mua').value=new Date().toISOString().split('T')[0]; ['f_ten_nguoi_ban','f_dia_chi','f_cccd','f_dien_thoai','f_ten_hang_hoa','f_so_luong','f_don_gia','f_thanh_toan','f_ghi_chu'].forEach(id=>{ if(id!=='f_so_luong') document.getElementById(id).value=''; }); document.getElementById('f_so_luong').value=1; }
+function closeModal(){ document.getElementById('bangkeModal').classList.add('hidden'); }
+function editItem(id){
+  const item = cacheData.find(x=>x.id===id);
+  if(!item) return;
+  document.getElementById('f_id').value=item.id;
+  document.getElementById('f_ngay_mua').value=item.ngay_mua||'';
+  document.getElementById('f_ten_nguoi_ban').value=item.ten_nguoi_ban||'';
+  document.getElementById('f_dia_chi').value=item.dia_chi||'';
+  document.getElementById('f_cccd').value=item.cccd||'';
+  document.getElementById('f_dien_thoai').value=item.dien_thoai||'';
+  document.getElementById('f_ten_hang_hoa').value=item.ten_hang_hoa||'';
+  document.getElementById('f_so_luong').value=item.so_luong||1;
+  document.getElementById('f_don_gia').value=item.don_gia||0;
+  document.getElementById('f_thanh_toan').value=item.thanh_toan||0;
+  document.getElementById('f_ghi_chu').value=item.ghi_chu||'';
+  document.getElementById('modalTitle').textContent='Sửa dòng bảng kê';
+  document.getElementById('bangkeModal').classList.remove('hidden');
+}
+async function saveData(){
+  const payload={
+    id: document.getElementById('f_id').value,
+    ngay_mua: document.getElementById('f_ngay_mua').value,
+    ten_nguoi_ban: document.getElementById('f_ten_nguoi_ban').value,
+    dia_chi: document.getElementById('f_dia_chi').value,
+    cccd: document.getElementById('f_cccd').value,
+    dien_thoai: document.getElementById('f_dien_thoai').value,
+    ten_hang_hoa: document.getElementById('f_ten_hang_hoa').value,
+    so_luong: document.getElementById('f_so_luong').value,
+    don_gia: document.getElementById('f_don_gia').value,
+    thanh_toan: document.getElementById('f_thanh_toan').value,
+    ghi_chu: document.getElementById('f_ghi_chu').value
+  };
+  if(!payload.ngay_mua || !payload.ten_nguoi_ban || !payload.ten_hang_hoa) return alert('Điền đủ ngày mua, tên người bán, tên hàng hóa');
+  const url = payload.id ? '/api/bangke/edit' : '/api/bangke/add';
+  try{
+    const res = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload)});
+    const result = await res.json();
+    if(result.status==='success'){ closeModal(); loadData(); } else alert(result.error||'Lỗi');
+  }catch(e){ alert('Lỗi kết nối'); }
+}
+async function deleteItem(id){
+  if(!confirm('Xóa dòng này?')) return;
+  try{
+    const res = await fetch('/api/bangke/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({id})});
+    const result = await res.json();
+    if(result.status==='success') loadData();
+  }catch(e){ alert('Lỗi'); }
+}
+function exportPDF(){
+  const from = document.getElementById('filterFrom').value;
+  const to = document.getElementById('filterTo').value;
+  const q = document.getElementById('searchInput').value.trim();
+  const params = new URLSearchParams();
+  if(from) params.append('from', from);
+  if(to) params.append('to', to);
+  if(q) params.append('q', q);
+  window.location.href = '/api/bangke/export-pdf?'+params.toString();
+}
+document.getElementById('searchInput').addEventListener('input', ()=>{ const q=document.getElementById('searchInput').value.toLowerCase(); if(!q){ renderTable(cacheData); return; } const filtered = cacheData.filter(r=> (r.ten_nguoi_ban||'').toLowerCase().includes(q) || (r.ten_hang_hoa||'').toLowerCase().includes(q) || (r.cccd||'').includes(q) || (r.dien_thoai||'').includes(q)); renderTable(filtered); });
+document.getElementById('f_so_luong').addEventListener('input', autoCalc);
+document.getElementById('f_don_gia').addEventListener('input', autoCalc);
+function autoCalc(){ const sl=Number(document.getElementById('f_so_luong').value)||0; const dg=Number(document.getElementById('f_don_gia').value)||0; if(sl && dg){ document.getElementById('f_thanh_toan').value = sl*dg; } }
+document.getElementById('filterFrom').addEventListener('change', function(){ const d=document.getElementById('filterFromDisplay'); if(d) d.textContent = this.value ? fmtDDMMYYYY(this.value) : 'dd/mm/yyyy'; });
+document.getElementById('filterTo').addEventListener('change', function(){ const d=document.getElementById('filterToDisplay'); if(d) d.textContent = this.value ? fmtDDMMYYYY(this.value) : 'dd/mm/yyyy'; });
+loadData();
+</script>
+{% endblock %}

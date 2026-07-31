@@ -1,0 +1,301 @@
+{% extends "admin_base.html" %}
+
+{% block title %}Quản lý ký gửi - Biolinh 2Hand{% endblock %}
+{% block breadcrumb_parent %}Quản lý chính{% endblock %}
+{% block breadcrumb_child %}Quản lý ký gửi{% endblock %}
+{% block mobile_title %}Ký gửi{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+<style>
+  .tab-active { background:#0f172a !important; color:white !important; }
+  .table-kysu th { font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:#64748b; font-weight:600; }
+  .pdf-landscape-mode { width:1050px !important; max-width:none !important; padding:30px !important; border:none !important; border-radius:0 !important; box-shadow:none !important; }
+  .pdf-landscape-mode table { width:100% !important; font-size:14px !important; border-collapse:collapse !important; }
+  .pdf-landscape-mode .table-bordered, .pdf-landscape-mode .table-bordered th, .pdf-landscape-mode .table-bordered td { border:1px solid #000 !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+  <!-- Header -->
+  <div class="flex flex-col md:flex-row justify-between gap-3">
+    <div>
+      <h2 class="text-[18px] font-bold text-slate-900 flex items-center gap-2"><i class="bi bi-box2-heart text-pink-600"></i> Quản Lý Ký Gửi</h2>
+      <p class="text-[12px] text-slate-500 mt-1">Gộp 2 file cũ: kygui (chờ) + kygui_history (đã TT) | Logic: kygui != '' là chờ, pay != '' là đã thanh toán | thoigian TEXT DD-MM-YYYY</p>
+    </div>
+    <div class="flex gap-2">
+      <button onclick="openAddModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[13px] font-medium shadow-sm">
+        <i class="bi bi-plus-circle mr-1"></i> Thêm Mới
+      </button>
+      <button onclick="exportHistoryPDF()" id="btnExport" class="hidden px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[13px] font-medium"><i class="bi bi-file-earmark-pdf mr-1"></i> Xuất PDF</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-1.5 flex gap-1.5 w-fit shadow-sm">
+    <a href="{{ url_for('kygui', tab='pending', filter_kygui=filter_kygui) }}" class="px-5 py-2 rounded-xl text-[13px] font-medium transition {% if active_tab != 'history' %}tab-active shadow{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+      <i class="bi bi-hourglass-split mr-1.5"></i> Chờ thanh toán ({{ pending_orders|length }})
+    </a>
+    <a href="{{ url_for('kygui', tab='history', filter_pay=filter_pay, filter_date=filter_date) }}" class="px-5 py-2 rounded-xl text-[13px] font-medium transition {% if active_tab == 'history' %}tab-active shadow{% else %}text-slate-600 hover:bg-slate-100{% endif %}">
+      <i class="bi bi-clock-history mr-1.5"></i> Lịch sử thanh toán ({{ history_orders|length }})
+    </a>
+  </div>
+
+  {% if active_tab != 'history' %}
+  <!-- ================= TAB 1: CHỜ ================= -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-600/20">
+      <div class="text-blue-100 text-[11px] font-semibold uppercase">Tổng tiền ký gửi</div>
+      <div class="text-[24px] font-bold mt-1">{{ total_price | vnd }} đ</div>
+    </div>
+    <div class="bg-amber-50 rounded-2xl p-5 border border-amber-200">
+      <div class="text-amber-700 text-[11px] font-semibold uppercase">Hoa hồng (30%)</div>
+      <div class="text-[24px] font-bold mt-1 text-amber-700">{{ commission | vnd }} đ</div>
+    </div>
+    <div class="bg-emerald-50 rounded-2xl p-5 border border-emerald-200">
+      <div class="text-emerald-700 text-[11px] font-semibold uppercase">Thực nhận (70%)</div>
+      <div class="text-[24px] font-bold mt-1 text-emerald-700">{{ net | vnd }} đ</div>
+    </div>
+  </div>
+
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-4 border-b flex flex-col md:flex-row justify-between gap-3">
+      <form method="GET" class="flex items-center gap-2">
+        <input type="hidden" name="tab" value="pending">
+        <label class="text-[13px] font-semibold">Chọn khách hàng:</label>
+        <select name="filter_kygui" class="px-3 py-2 border border-slate-200 rounded-xl text-[13px] bg-white" onchange="this.form.submit()">
+          <option value="all" {% if filter_kygui == 'all' %}selected{% endif %}>Tất cả</option>
+          {% for kh in khach_hang_list_pending %}
+          <option value="{{ kh }}" {% if filter_kygui == kh %}selected{% endif %}>{{ kh }}</option>
+          {% endfor %}
+        </select>
+      </form>
+      <form method="POST" action="{{ url_for('process_payment') }}" onsubmit="return confirm('Thanh toán toàn bộ cho khách này?');" class="flex items-center gap-2">
+        <input type="hidden" name="khach_hang" value="{{ filter_kygui }}">
+        <button type="submit" class="px-4 py-2 text-white font-bold rounded-xl text-[13px] shadow-sm" style="background-color:#ff5722;" {% if filter_kygui == 'all' %}disabled{% endif %}>
+          Thanh Toán Cho Khách Đã Chọn
+        </button>
+      </form>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full table-kysu">
+        <thead class="bg-slate-50 border-b">
+          <tr>
+            <th class="text-center px-4 py-3">ID</th>
+            <th class="text-left px-4 py-3">Mã Đơn Hàng</th>
+            <th class="text-left px-4 py-3">Tên Người Mua</th>
+            <th class="text-left px-4 py-3">ID Tiktok</th>
+            <th class="text-right px-4 py-3">Giá Mua</th>
+            <th class="text-left px-4 py-3">Ký Gửi</th>
+            <th class="text-center px-4 py-3">Hành Động</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {% for row in pending_orders %}
+          <tr class="text-[13px] hover:bg-slate-50">
+            <td class="px-4 py-3 text-center text-slate-500">{{ row['id'] }}</td>
+            <td class="px-4 py-3 font-medium">{{ row['order_id'] }}</td>
+            <td class="px-4 py-3">{{ row['nickname'] }}</td>
+            <td class="px-4 py-3"><span class="text-[11px] bg-slate-100 px-2 py-0.5 rounded-full">{{ row['username'] }}</span></td>
+            <td class="px-4 py-3 text-right font-bold text-red-600">{{ row['price'] | vnd }} đ</td>
+            <td class="px-4 py-3"><span class="px-2 py-0.5 bg-pink-50 border border-pink-200 text-pink-700 rounded-full text-[11px] font-medium">{{ row['kygui'] }}</span></td>
+            <td class="px-4 py-3 text-center">
+              <form method="POST" action="{{ url_for('delete_kygui', id=row['id']) }}" onsubmit="return confirm('Xóa dòng này?');">
+                <button type="submit" class="w-7 h-7 rounded-lg bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 inline-flex items-center justify-center"><i class="bi bi-trash text-[12px]"></i></button>
+              </form>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="text-center py-10 text-slate-400">Không có dữ liệu ký gửi.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% else %}
+  <!-- ================= TAB 2: LỊCH SỬ ================= -->
+  <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+    <form method="GET" class="flex flex-wrap gap-3 items-end">
+      <input type="hidden" name="tab" value="history">
+      <div>
+        <label class="text-[11px] font-semibold uppercase text-slate-500">Khách hàng:</label>
+        <select name="filter_pay" class="mt-1 px-3 py-2 border border-slate-200 rounded-xl text-[13px] bg-white">
+          <option value="all" {% if filter_pay == 'all' %}selected{% endif %}>-- Tất cả khách --</option>
+          {% for kh in khach_hang_list_history %}
+          <option value="{{ kh }}" {% if filter_pay == kh %}selected{% endif %}>{{ kh }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label class="text-[11px] font-semibold uppercase text-slate-500">Ngày thanh toán:</label>
+        <select name="filter_date" class="mt-1 px-3 py-2 border border-slate-200 rounded-xl text-[13px] bg-white">
+          <option value="all" {% if filter_date == 'all' %}selected{% endif %}>-- Tất cả ngày --</option>
+          {% for ngay in ngay_list %}
+          <option value="{{ ngay }}" {% if filter_date == ngay %}selected{% endif %}>{{ ngay|vn_date }} ({{ ngay }})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-xl text-[13px]"><i class="bi bi-search mr-1"></i> Lọc</button>
+      <a href="{{ url_for('kygui', tab='history') }}" class="px-4 py-2 border border-slate-200 rounded-xl text-[13px] bg-white hover:bg-slate-50">Xóa lọc</a>
+    </form>
+  </div>
+
+  <div id="exportArea" class="p-6 bg-white border border-slate-200 rounded-2xl shadow-sm">
+    <div class="text-center mb-6">
+      <h3 class="font-bold text-[18px] uppercase">Bảng Kê Chi Tiết Hàng Ký Gửi</h3>
+      <p class="mb-1 text-[13px]">Khách hàng: <strong id="pdf_khach">{{ filter_pay if filter_pay != 'all' else 'Tất cả' }}</strong></p>
+      <p class="text-[13px]">Ngày thanh toán: <strong id="pdf_ngay">{{ filter_date|vn_date if filter_date != 'all' else 'tất cả' }}</strong> <span class="text-[11px] text-slate-500">({{ filter_date if filter_date != 'all' else '' }})</span></p>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full table-bordered border">
+        <thead class="bg-slate-50 text-center">
+          <tr class="text-[11px] uppercase font-semibold text-slate-600">
+            <th class="border px-3 py-2" style="width:15%">Mã Đơn</th>
+            <th class="border px-3 py-2">Tên Người Mua</th>
+            <th class="border px-3 py-2">ID Tiktok</th>
+            <th class="border px-3 py-2" style="width:20%">Giá Mua</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in history_orders %}
+          <tr class="text-[13px]">
+            <td class="border px-3 py-2 text-center">{{ row['order_id'] }}</td>
+            <td class="border px-3 py-2">{{ row['nickname'] }}</td>
+            <td class="border px-3 py-2">{{ row['username'] }}</td>
+            <td class="border px-3 py-2 text-right font-bold">{{ row['price'] | vnd }} đ</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="4" class="border text-center py-6 text-slate-400">Không có dữ liệu lịch sử.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="flex justify-end mt-6">
+      <div class="w-full md:w-[340px]">
+        <table class="w-full text-[13px]">
+          <tr><td class="py-1.5">Tổng tiền hàng:</td><td class="text-right font-bold">{{ history_total_price | vnd }} đ</td></tr>
+          <tr><td class="py-1.5">Phí dịch vụ (30%):</td><td class="text-right text-red-600">- {{ history_commission | vnd }} đ</td></tr>
+          <tr class="border-t"><td class="py-2.5 font-bold">Thực thanh toán:</td><td class="text-right font-bold text-emerald-600 text-[16px]">{{ history_net | vnd }} đ</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="flex justify-end mt-10 mr-10 pb-10">
+      <div class="text-center min-w-[200px]">
+        <p class="mb-12 text-[13px]">Người lập biểu</p>
+        <p class="font-bold">Đỗ Thùy Linh</p>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Modal Thêm (Tailwind Native Overlay) -->
+<div id="addModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-md border border-slate-200 overflow-hidden transform transition-all">
+    <!-- Header -->
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+      <h3 class="text-[15px] font-bold text-slate-800 flex items-center gap-2">
+        <i class="bi bi-plus-circle-fill text-blue-600"></i> Thêm Dữ Liệu Ký Gửi
+      </h3>
+      <button type="button" onclick="closeAddModal()" class="w-8 h-8 rounded-xl hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 inline-flex items-center justify-center transition">
+        <i class="bi bi-x-lg text-[14px]"></i>
+      </button>
+    </div>
+
+    <!-- Form -->
+    <form method="POST" action="{{ url_for('add_kygui') }}">
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="block text-[12px] font-semibold text-slate-700 mb-1">Mã Đơn Hàng <span class="text-red-500">*</span></label>
+          <input type="text" name="order_id" required class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-slate-50/50" placeholder="VD: DH123456">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[12px] font-semibold text-slate-700 mb-1">Tên Người Mua</label>
+            <input type="text" name="nickname" class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-slate-50/50" placeholder="Nickname">
+          </div>
+          <div>
+            <label class="block text-[12px] font-semibold text-slate-700 mb-1">ID Tiktok</label>
+            <input type="text" name="username" class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-slate-50/50" placeholder="@username">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[12px] font-semibold text-slate-700 mb-1">Giá Mua (VNĐ) <span class="text-red-500">*</span></label>
+          <input type="number" step="1000" name="price" required class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-slate-50/50 font-bold text-red-600" placeholder="0">
+        </div>
+
+        <div>
+          <label class="block text-[12px] font-semibold text-slate-700 mb-1">Ký Gửi (Tên Khách) <span class="text-red-500">*</span></label>
+          <input type="text" name="kygui" required list="khachList" class="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-[13px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 bg-slate-50/50" placeholder="Chọn hoặc nhập tên khách">
+          <datalist id="khachList">
+            {% for kh in khach_hang_list_pending %}
+            <option value="{{ kh }}">
+            {% endfor %}
+          </datalist>
+        </div>
+      </div>
+
+      <!-- Footer Buttons -->
+      <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex justify-end gap-2">
+        <button type="button" onclick="closeAddModal()" class="px-4 py-2 border border-slate-200 text-slate-600 rounded-xl text-[13px] font-medium hover:bg-slate-100 transition">Hủy</button>
+        <button type="submit" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[13px] font-medium shadow-sm transition">Lưu Lại</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+  // Hiện nút xuất PDF chỉ khi ở tab history
+  const activeTab = "{{ active_tab }}";
+  if(activeTab === 'history'){
+    document.getElementById('btnExport')?.classList.remove('hidden');
+  }
+  function exportHistoryPDF() {
+    const element = document.getElementById('exportArea');
+    const khach = document.getElementById('pdf_khach').innerText;
+    const ngay = document.getElementById('pdf_ngay').innerText;
+    element.classList.add('pdf-landscape-mode');
+    const opt = {
+      margin: [10,10,10,10],
+      filename: `BangKe_${khach}_${ngay}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, width: 1050 },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+    };
+    html2pdf().set(opt).from(element).save().then(() => {
+      element.classList.remove('pdf-landscape-mode');
+    });
+  }
+
+  function openAddModal() {
+    const modal = document.getElementById('addModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+  }
+
+  function closeAddModal() {
+    const modal = document.getElementById('addModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }
+
+  // Đóng modal khi bấm ra ngoài vùng dialog
+  window.addEventListener('click', function(e) {
+    const modal = document.getElementById('addModal');
+    if (e.target === modal) {
+      closeAddModal();
+    }
+  });
+</script>
+{% endblock %}

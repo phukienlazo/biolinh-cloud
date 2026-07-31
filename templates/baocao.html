@@ -1,0 +1,647 @@
+{% extends "admin_base.html" %}
+{% block title %}Báo cáo tổng kết - Biolinh 2Hand{% endblock %}
+{% block breadcrumb_parent %}Báo cáo{% endblock %}
+{% block breadcrumb_child %}Tổng kết{% endblock %}
+{% block mobile_title %}Báo cáo tổng kết{% endblock %}
+
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+#print-s2a-container { font-family: "Times New Roman", Times, serif !important; background:#fff !important; }
+#print-s2a-container * { font-family: "Times New Roman", Times, serif !important; }
+#print-s2a-container table.table-s2a { width:100%; border-collapse:collapse !important; }
+#print-s2a-container table.table-s2a th, #print-s2a-container table.table-s2a td { border:1px solid #000 !important; padding:5px 8px !important; vertical-align:middle !important; word-break:break-word !important; }
+@media print {
+  @page { size:A4 portrait; margin:15mm 12mm; }
+  html,body{margin:0 !important;padding:0 !important;background:#fff !important;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important}
+  aside,header,.no-print,#reportTabs,#quickFilterBar,#taxHistoryCard,.tab-btn{display:none !important}
+  main{margin:0 !important;padding:0 !important}
+  #tab-summary,#tab-customers,#tab-kho{display:none !important}
+  #tab-s2a{display:block !important}
+  #print-s2a-container{width:100% !important; border:none !important; box-shadow:none !important;}
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+  <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+    <div>
+      <h2 class="text-[22px] font-bold text-slate-900 flex items-center gap-2"><i class="bi bi-pie-chart-fill text-blue-600"></i> Hệ thống báo cáo</h2>
+      <p class="text-[13px] text-slate-500 mt-1">Định dạng <b>dd/mm/yyyy</b> • Nguồn <b>doisoat</b> • Mặc định <b>tháng này (01/{{ current_month|default('07') }}/{{ current_year }} - {{ today_ddmmyyyy }})</b> • {{ stats.tong_don|default(0) }} đơn đối soát</p>
+    </div>
+    <div class="flex items-center gap-2 no-print">
+      <!--<button onclick="exportS2aToPDF()" class="h-10 px-4 bg-white border border-slate-200 rounded-xl text-[13px] font-medium hover:bg-slate-50 flex items-center gap-2"><i class="bi bi-printer"></i> In Sổ S2a</button>
+      <button onclick="exportExcel()" class="h-10 px-4 bg-[#0f172a] text-white rounded-xl text-[13px] font-medium hover:bg-black flex items-center gap-2"><i class="bi bi-download"></i> Xuất Excel</button> -->
+    </div>
+  </div>
+
+  <div id="quickFilterBar" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-4">
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="text-[11px] font-semibold tracking-widest text-slate-500 mr-1">BỘ LỌC NHANH:</span>
+        <div class="flex flex-wrap gap-1.5">
+          <button data-filter="all" class="q-filter px-3.5 py-2 rounded-full text-[13px] font-medium border transition bg-white text-slate-700 border-slate-200 hover:bg-slate-50">Tất cả</button>
+          <button data-filter="month" class="q-filter active px-3.5 py-2 rounded-full text-[13px] font-medium border transition bg-blue-600 text-white border-blue-600 shadow-sm shadow-blue-600/20">Tháng này</button>
+          <button data-filter="quarter" class="q-filter px-3.5 py-2 rounded-full text-[13px] font-medium border transition bg-white text-slate-700 border-slate-200 hover:bg-slate-50">Quý này</button>
+          <button data-filter="year" class="q-filter px-3.5 py-2 rounded-full text-[13px] font-medium border transition bg-white text-slate-700 border-slate-200 hover:bg-slate-50">Năm nay</button>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <select id="yearSelect" class="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-500"></select>
+        <select id="quarterSelect" class="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[13px] outline-none hidden">
+          <option value="1">Quý 1 (T1-T3)</option><option value="2">Quý 2 (T4-T6)</option><option value="3">Quý 3 (T7-T9)</option><option value="4">Quý 4 (T10-T12)</option>
+        </select>
+        <select id="monthSelect" class="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[13px] outline-none">
+          <option value="1">Tháng 1</option><option value="2">Tháng 2</option><option value="3">Tháng 3</option><option value="4">Tháng 4</option><option value="5">Tháng 5</option><option value="6">Tháng 6</option><option value="7">Tháng 7</option><option value="8">Tháng 8</option><option value="9">Tháng 9</option><option value="10">Tháng 10</option><option value="11">Tháng 11</option><option value="12">Tháng 12</option>
+        </select>
+      </div>
+    </div>
+    <div class="flex flex-col md:flex-row md:items-center gap-3 pt-3 border-t border-slate-100">
+      <div class="flex items-center gap-2 flex-1">
+        <label class="text-[11px] font-semibold tracking-widest text-slate-500 w-[60px]">TỪ NGÀY</label>
+        <input type="date" id="dateFrom" class="flex-1 h-10 px-3 bg-white border border-slate-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-500 max-w-[180px]">
+        <span class="text-[12px] text-slate-500 bg-slate-50 border px-2.5 py-1 rounded-full font-mono" id="fromDisplay">dd/mm/yyyy</span>
+      </div>
+      <div class="flex items-center gap-2 flex-1">
+        <label class="text-[11px] font-semibold tracking-widest text-slate-500 w-[60px]">ĐẾN NGÀY</label>
+        <input type="date" id="dateTo" class="flex-1 h-10 px-3 bg-white border border-slate-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-500 max-w-[180px]">
+        <span class="text-[12px] text-slate-500 bg-slate-50 border px-2.5 py-1 rounded-full font-mono" id="toDisplay">dd/mm/yyyy</span>
+        <button onclick="applyCustomDate()" class="h-10 w-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center justify-center shadow-sm"><i class="bi bi-search"></i></button>
+      </div>
+      <div class="text-[12px] text-slate-600 bg-blue-50 border border-blue-200 rounded-full px-3 py-1.5" id="rangeLabel">Đang xem: <b class="text-slate-900">...</b></div>
+    </div>
+  </div>
+
+  <div class="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit no-print" id="reportTabs">
+    <button data-tab="summary" class="tab-btn active px-4 py-2 rounded-lg bg-white shadow-sm text-[13px] font-semibold text-slate-900">Báo cáo tổng kết</button>
+    <button data-tab="s2a" class="tab-btn px-4 py-2 rounded-lg text-[13px] font-medium text-slate-600 hover:text-slate-900">Sổ S2a-HKD</button>
+    <button data-tab="customers" class="tab-btn px-4 py-2 rounded-lg text-[13px] font-medium text-slate-600 hover:text-slate-900">Báo cáo khách hàng</button>
+    <button data-tab="kho" class="tab-btn px-4 py-2 rounded-lg text-[13px] font-medium text-slate-600 hover:text-slate-900">Báo cáo kho</button>
+  </div>
+
+  <!-- TAB SUMMARY -->
+  <div id="tab-summary" class="tab-pane space-y-5">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl p-5 text-white shadow-lg shadow-blue-600/20 relative overflow-hidden">
+        <div class="absolute right-0 top-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8"></div>
+        <div class="relative"><div class="text-blue-100 text-[11px] tracking-widest font-semibold" id="labelRev">DOANH THU THÁNG NÀY</div><div class="text-[26px] font-bold mt-2" id="sumRev">0₫</div><div class="text-[12px] text-blue-100 mt-1" id="revSub">01/07/2026 - 19/07/2026</div></div>
+      </div>
+      <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><div class="flex justify-between items-start"><div><div class="text-[11px] tracking-widest text-slate-500 font-semibold" id="labelCount">SỐ ĐƠN THÁNG NÀY</div><div class="text-[26px] font-bold mt-2 text-slate-900" id="sumCount">0</div><div class="text-[12px] text-emerald-600 mt-1">Đã đối soát: <b id="daDoiSoat">0</b></div></div><div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><i class="bi bi-receipt text-xl"></i></div></div></div>
+      <div class="bg-white rounded-2xl p-5 border border-amber-200 shadow-sm bg-amber-50/30">
+        <div class="flex justify-between items-start mb-3"><div><div class="text-[11px] tracking-widest text-amber-700 font-semibold" id="labelTax">DỰ TOÁN THUẾ THÁNG NÀY</div><div class="text-[20px] font-bold mt-2 text-slate-900" id="sumTax">0₫</div><div class="text-[11px] text-slate-600 mt-1" id="taxRateDetail">Theo quy định HKD</div></div><div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center"><i class="bi bi-bank text-xl"></i></div></div>
+        <button onclick="openTaxModal()" class="w-full bg-[#0f172a] text-white py-2 rounded-xl text-[12px] font-semibold hover:bg-black flex items-center justify-center gap-2"><i class="bi bi-check-circle"></i> Ghi nhận nộp thuế</button>
+      </div>
+      <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><div class="flex justify-between items-start"><div><div class="text-[11px] tracking-widest text-slate-500 font-semibold" id="labelAvg">TB MỖI ĐƠN THÁNG NÀY</div><div class="text-[20px] font-bold mt-2 text-slate-900" id="sumAvg">0₫</div><div class="text-[12px] text-slate-500 mt-1" id="avgSub">0 đơn</div></div><div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center"><i class="bi bi-graph-up text-xl"></i></div></div></div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div class="lg:col-span-2 space-y-5">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-bold text-slate-900 flex items-center gap-2 text-[13px]"><i class="bi bi-bar-chart-steps text-blue-600"></i> Tiến độ doanh thu năm <span id="namLuyKeTienDo">{{ current_year }}</span></h3>
+            <span class="text-[10px] font-semibold px-2.5 py-0.5 bg-blue-100 text-blue-800 rounded-full" id="badgeTenNhom">HKD thuộc nhóm...</span>
+          </div>
+          <div class="flex items-center justify-between text-[13px] text-slate-600 mb-1.5">
+            <span>Lũy kế từ 01/01/<span id="yearLabel">{{ current_year }}</span> đến <span id="todayLabel">{{ today_ddmmyyyy }}</span>: <b id="textLuyKeHienTai" class="text-slate-900">0₫</b></span>
+            <span id="conLaiText" class="text-[13px]">Còn lại: <b id="textConLaiSangNguong" class="text-amber-600">0₫</b> nữa sang ngưỡng mới</span>
+          </div>
+          <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div id="thanhTienDo" class="h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full transition-all duration-700" style="width:0%"></div>
+          </div>
+          <div class="flex justify-between text-[10px] text-slate-500 mt-1">
+            <span>0%</span><span id="phanTramText" class="font-bold text-blue-600">0%</span><span>100% (Ngưỡng 2026)</span>
+          </div>
+
+          <div id="khuVucCanhBao" class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl text- text-amber-800 leading-relaxed"><i class="bi bi-info-circle-fill mr-1"></i> <span id="textTaxNote">Đang tải hướng dẫn...</span></div>
+        </div>
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <div class="flex items-center justify-between mb-5"><h3 class="font-bold text-slate-900">Doanh thu theo ngày <span class="text-[11px] font-normal text-slate-500">(từ bảng doisoat)</span></h3><span class="text-[11px] px-2 py-1 bg-slate-100 rounded-full" id="chartRangeLabel">01/07/2026 - 19/07/2026</span></div>
+          <canvas id="dailyChart" height="130"></canvas>
+        </div>
+        <div id="taxHistoryCard" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+          <h3 class="font-bold text-slate-900 mb-4 flex items-center gap-2"><i class="bi bi-journal-check text-blue-600"></i> Lịch sử nộp thuế năm <span id="taxYearTitle">{{ current_year }}</span></h3>
+          <div class="overflow-x-auto"><table class="w-full text-[12px]"><thead class="bg-slate-50 text-[11px] tracking-widest text-slate-500"><tr><th class="px-3 py-2 text-left">Ngày nộp (dd/mm/yyyy)</th><th class="px-3 py-2 text-left">Kỳ</th><th class="px-3 py-2 text-right">Doanh thu kỳ</th><th class="px-3 py-2 text-right">Lũy kế</th><th class="px-3 py-2 text-right">GTGT</th><th class="px-3 py-2 text-right">TNCN</th><th class="px-3 py-2 text-right font-bold">Tổng thuế</th></tr></thead><tbody id="taxLogBody" class="divide-y divide-slate-100"><tr><td colspan="7" class="text-center py-6 text-slate-400">Đang tải...</td></tr></tbody></table></div>
+        </div>
+      </div>
+      <div class="space-y-5">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6"><h3 class="font-bold text-slate-900 mb-4">Top 5 khách hàng kỳ này</h3><div id="topCustomersList" class="space-y-3"><div class="text-center py-8 text-slate-400 text-sm">Đang tải...</div></div></div>
+        <div class="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-5 text-white"><h4 class="font-bold text-sm">Mẹo sử dụng</h4><ul class="text-[12px] text-slate-300 mt-3 space-y-2 list-disc pl-4 leading-relaxed"><li>Bấm <b>Tháng này / Quý này / Năm nay</b> để tự động điền ngày dd/mm/yyyy</li><li>Sổ S2a-HKD sẽ lọc theo đúng kỳ bạn đang xem, bấm In để in A4</li><li>Nút <b>Ghi nhận nộp thuế</b> sẽ lưu vào bảng <code>log_nop_thue</code> trong khachhang.db</li><li>Báo cáo khách hàng & kho lấy từ <code>tonghopdon</code> và <code>chitietdon</code></li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB S2A -->
+  
+  <div id="tab-s2a" class="tab-pane hidden space-y-4">
+    <div class="flex justify-end gap-2 mb-3 no-print">
+      <!----<button class="h-10 px-4 bg-white border border-slate-200 rounded-xl text-[13px] font-medium hover:bg-slate-50 flex items-center gap-2" onclick="window.print()"><i class="bi bi-printer"></i> In trực tiếp</button-->
+      <button class="h-10 px-4 bg-red-600 text-white rounded-xl text-[13px] font-medium hover:bg-red-700 flex items-center gap-2" onclick="exportS2aToPDF()"><i class="bi bi-file-earmark-pdf"></i> Xuất File PDF</button>
+    </div>
+    <div id="print-s2a-container" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6" style="font-family: 'Times New Roman', Times, serif; color:#000;">
+      <style>
+        #print-s2a-container .a4-page { width:100%; background:#fff; }
+        #print-s2a-container table.table-s2a { width:100%; border-collapse:collapse; font-size:13px; }
+        #print-s2a-container table.table-s2a th, #print-s2a-container table.table-s2a td { border:1px solid #000; padding:5px 8px; vertical-align:middle; word-break:break-word; }
+        #print-s2a-container table.table-s2a th { text-align:center; font-weight:bold; }
+      </style>
+      <div class="flex justify-between" style="font-size:13px;">
+        <div style="width:60%;">
+          <div><b>HỘ, CÁ NHÂN KINH DOANH:</b> <span id="hkd_name">{{ business.name }}</span></div>
+          <div><b>Địa chỉ:</b> <span id="hkd_address">{{ business.address }}</span></div>
+          <div><b>Mã số thuế:</b> <span id="hkd_tax">{{ business.tax_id }}</span></div>
+        </div>
+        <div style="width:40%; text-align:center; font-size:12px;">
+          <div style="font-weight:700;">Mẫu số S2a-HKD</div>
+          <div style="font-style:italic; font-size:11px;">(Kèm theo Thông tư số 152/2025/TT-BTC<br>ngày 31 tháng 12 năm 2025 của Bộ trưởng<br>Bộ Tài chính)</div>
+        </div>
+      </div>
+      <div style="text-align:center; margin-top:15px; margin-bottom:5px;">
+        <div style="font-size:16px; font-weight:bold;">SỔ DOANH THU BÁN HÀNG HÓA, DỊCH VỤ</div>
+        <div style="font-size:13px;">Địa điểm kinh doanh: <span id="hkd_address2">{{ business.address }}</span></div>
+        <div style="font-size:13px;">Kỳ kê khai: <span id="s2aKyKeKhai" style="font-weight:700; color:#c00000;">...</span></div>
+        <div style="text-align:right; font-style:italic; font-size:12px;">Đơn vị tính: Đồng</div>
+      </div>
+      <table class="table-s2a" id="s2aTable">
+        <thead>
+          <tr>
+            <th colspan="2">Chứng từ</th>
+            <th rowspan="2" style="width:46%;">Diễn giải</th>
+            <th rowspan="2" style="width:18%;">Số tiền</th>
+          </tr>
+          <tr>
+            <th style="width:18%;">Số hiệu</th>
+            <th style="width:18%;">Ngày, tháng</th>
+          </tr>
+          <tr style="font-style:italic; text-align:center;">
+            <td>A</td><td>B</td><td>C</td><td>1</td>
+          </tr>
+        </thead>
+        <tbody id="s2aBody">
+          <tr><td colspan="4" style="text-align:center; padding:12px;">Đang tải dữ liệu...</td></tr>
+        </tbody>
+        <tbody id="s2aFoot"></tbody>
+      </table>
+      <!-- THÊM MỚI: Tổng hợp đồng bộ với báo cáo tổng kết -->
+      <div id="s2aSummaryBox" class="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-[13px] leading-relaxed" style="font-family: 'Times New Roman', Times, serif;">
+        <div class="font-bold text-[13px] mb-2">TỔNG HỢP BÁO CÁO</div>
+        <div>Nhóm thuế hiện tại: <b id="s2aGroupName">...</b> - <span id="s2aGroupNote">...</span></div>
+        <div>Tổng doanh thu kỳ này: <b id="s2aTotalRev">0₫</b></div>
+        <div>Thuế suất áp dụng: GTGT <b id="s2aVatRate">0%</b> + TNCN <b id="s2aPitRate">0%</b></div>
+        <div>Tổng thuế phải nộp kỳ này: <b id="s2aTotalTax" class="text-red-600">0₫</b> (GTGT: <span id="s2aVatTax">0₫</span> + TNCN: <span id="s2aPitTax">0₫</span>)</div>
+        </div>
+      <div style="display:flex; justify-content:flex-end; margin-top:20px; font-size:13px;">
+        <div style="width:50%; text-align:center;">
+          <div style="font-style:italic;">Ngày <span id="s2aNgayLap">..</span> tháng <span id="s2aThangLap">..</span> năm <span id="s2aNamLap">..</span></div>
+          <div style="font-weight:bold;">NGƯỜI ĐẠI DIỆN HỘ KINH DOANH/<br>CÁ NHÂN KINH DOANH</div>
+          <div style="font-style:italic;">(Ký, ghi rõ họ tên và đóng dấu (nếu có))</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="tab-customers" class="tab-pane hidden space-y-6">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h3 class="font-bold text-slate-900 text-[15px] flex items-center gap-2"><i class="bi bi-people-fill text-blue-600"></i> Tìm kiếm khách hàng (toàn thời gian - bảng doisoat)</h3>
+          <p class="text-[12px] text-slate-500 mt-1">Tìm theo nickname, username - hiển thị số đơn & tổng tiền đã thanh toán</p>
+        </div>
+        <div class="relative w-full md:w-80">
+          <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+          <input id="searchCustomerLive" placeholder="Nhập nickname, username..." class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+      </div>
+      <div id="liveSearchResult" class="mt-4 hidden">
+        <div class="overflow-x-auto border border-slate-200 rounded-xl"><table class="w-full text-[13px]"><thead class="bg-slate-50 text-[11px] tracking-widest text-slate-500"><tr><th class="px-3 py-2.5">#</th><th class="px-3 py-2.5 text-left">Khách hàng</th><th class="px-3 py-2.5 text-left">Username</th><th class="px-3 py-2.5 text-center">Số đơn đã mua</th><th class="px-3 py-2.5 text-right">Tổng tiền đã thanh toán</th><th class="px-3 py-2.5 text-center">Lần mua cuối</th></tr></thead><tbody id="liveSearchBody" class="divide-y divide-slate-100"></tbody></table></div>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b flex items-center justify-between"><h3 class="font-bold text-slate-900">🏆 Top 20 khách hàng mua nhiều nhất (toàn thời gian)</h3><span class="text-[11px] px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full font-semibold">Nguồn: doisoat • total_payment</span></div>
+      <div class="overflow-x-auto"><table class="w-full text-[13px]"><thead class="bg-slate-50 text-[11px] tracking-widest text-slate-500"><tr><th class="px-3 py-2.5">#</th><th class="px-3 py-2.5 text-left">Khách hàng</th><th class="px-3 py-2.5 text-left">Username</th><th class="px-3 py-2.5 text-center">Số lượng đơn đã mua</th><th class="px-3 py-2.5 text-right">Tổng tiền đã thanh toán</th></tr></thead><tbody id="top20Body" class="divide-y divide-slate-100"><tr><td colspan="5" class="text-center py-10 text-slate-400">Đang tải...</td></tr></tbody></table></div>
+      <div class="p-3 bg-slate-50 border-t text-[12px] text-slate-600" id="top20Stats">Chưa tải</div>
+    </div>
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div><h3 class="font-bold text-slate-900">💤 Khách hàng đã lâu chưa quay lại mua hàng</h3><p class="text-[12px] text-slate-500 mt-1">Cần phương án chăm sóc, remarketing</p></div>
+        <div class="flex items-center gap-2"><label class="text-[11px] font-semibold tracking-widest text-slate-500">TRONG</label><input id="inactiveMonths" type="number" min="1" value="3" class="w-20 h-9 px-3 bg-slate-50 border border-slate-200 rounded-xl text-[13px] text-center outline-none focus:ring-2 focus:ring-blue-500"><span class="text-[12px] text-slate-600">tháng trở lại đây chưa mua</span><button onclick="loadInactiveCustomers()" class="h-9 px-4 bg-[#0f172a] text-white rounded-xl text-[12px] font-semibold hover:bg-black flex items-center gap-1.5"><i class="bi bi-funnel"></i> Lọc</button></div>
+      </div>
+      <div class="overflow-x-auto"><table class="w-full text-[13px]"><thead class="bg-slate-50 text-[11px] tracking-widest text-slate-500"><tr><th class="px-3 py-2.5">#</th><th class="px-3 py-2.5 text-left">Khách hàng</th><th class="px-3 py-2.5 text-left">Username</th><th class="px-3 py-2.5 text-center">Lần mua cuối</th><th class="px-3 py-2.5 text-center">Số ngày chưa mua</th><th class="px-3 py-2.5 text-right">Tổng đã mua</th><th class="px-3 py-2.5 text-center">Số đơn</th><th class="px-3 py-2.5 text-center">Gợi ý CSKH</th></tr></thead><tbody id="inactiveBody" class="divide-y divide-slate-100"><tr><td colspan="8" class="text-center py-10 text-slate-400">Chọn số tháng và bấm Lọc</td></tr></tbody></table></div>
+      <div class="p-3 bg-amber-50 border-t text-[12px] text-amber-800" id="inactiveStats"><i class="bi bi-lightbulb-fill"></i> Gợi ý: Gửi tin nhắn ưu đãi cho khách đã lâu chưa quay lại.</div>
+    </div>
+  </div>
+
+  
+  <div id="tab-kho" class="tab-pane hidden space-y-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 text-center shadow-sm">
+        <div class="text-3xl">🧾</div>
+        <div class="text-2xl font-bold mt-2 text-slate-900" id="khoTongDonKho">0</div>
+        <div class="text-[11px] tracking-widest text-slate-500 font-semibold mt-1">TỔNG ĐƠN TRONG KHO (chốt chưa vận chuyển)</div>
+        <div class="text-[11px] text-slate-400 mt-1" id="khoTongDonKhoSub">0 khách • 0₫ tổng</div>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 text-center shadow-sm">
+        <div class="text-3xl">📦</div>
+        <div class="text-2xl font-bold mt-2 text-slate-900" id="khoTongSPKho">0</div>
+        <div class="text-[11px] tracking-widest text-slate-500 font-semibold mt-1">TỔNG SỐ LƯỢNG HÀNG HÓA (SP trong kho)</div>
+        <div class="text-[11px] text-slate-400 mt-1" id="khoTongSPKhoSub">Từ bảng tonghopdon • Đang Dồn</div>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-4 border-b space-y-3">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <h3 class="font-bold text-slate-900 flex items-center gap-2"><i class="bi bi-box-seam text-blue-600"></i> Báo cáo kho - Đơn đang dồn</h3>
+          <button onclick="fetchTongHopDon()" class="h-9 px-4 bg-blue-600 text-white rounded-xl text-[12px] font-semibold hover:bg-blue-700 flex items-center gap-1.5"><i class="bi bi-arrow-clockwise"></i> Làm mới</button>
+        </div>
+        <div class="flex flex-col lg:flex-row gap-3 bg-slate-50 p-3 rounded-xl border border-slate-100">
+          <div class="flex items-center gap-2 flex-1">
+            <label class="text-[11px] font-semibold tracking-widest text-slate-500 whitespace-nowrap">BỘ LỌC:</label>
+            <select id="khoFilterType" class="flex-1 h-9 px-3 bg-white border border-slate-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="all">Tất cả đơn</option>
+              <option value="nococ">Đơn chưa cọc (cọc = 0)</option>
+              <option value="coc_duoi_100k">Đơn cọc dưới 100k</option>
+              <option value="chua_the_di">Các đơn chưa thể đi (Còn thiếu <= -19k)</option>
+              <option value="co_the_di">Các đơn có thể đi (Còn thiếu >= -19k)</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-2 flex-1">
+            <label class="text-[11px] font-semibold tracking-widest text-slate-500 whitespace-nowrap">SẮP XẾP:</label>
+            <select id="khoSortType" class="flex-1 h-9 px-3 bg-white border border-slate-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="gia_giam">Giá trị đơn giảm dần</option>
+              <option value="gia_tang">Giá trị đơn tăng dần</option>
+              <option value="sl_giam">Số lượng đơn giảm dần</option>
+              <option value="sl_tang">Số lượng đơn tăng dần</option>
+            </select>
+          </div>
+          <div class="relative flex-1">
+            <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+            <input id="khoSearch" placeholder="Tìm nickname, username..." class="w-full pl-8 pr-3 h-9 bg-white border border-slate-200 rounded-xl text-[13px] outline-none focus:ring-2 focus:ring-blue-500">
+          </div>
+        </div>
+      </div>
+      <div class="overflow-x-auto"><table class="w-full text-[13px]"><thead class="bg-slate-50 text-[11px] tracking-widest text-slate-500"><tr><th class="px-3 py-2">#</th><th class="px-3 py-2 text-left">Nickname</th><th class="px-3 py-2 text-left">Username</th><th class="px-3 py-2 text-right">Tổng tiền</th><th class="px-3 py-2 text-right">Cọc</th><th class="px-3 py-2 text-right">Còn thiếu</th><th class="px-3 py-2 text-left">Mã đơn (8 ký tự)</th><th class="px-3 py-2 text-center">SL</th></tr></thead><tbody id="khoBody" class="divide-y divide-slate-100"><tr><td colspan="8" class="text-center py-10 text-slate-400">Bấm Làm mới để tải</td></tr></tbody></table></div>
+      <div class="p-3 bg-slate-50 border-t text-[12px] text-slate-600 flex flex-col md:flex-row justify-between gap-2" id="khoStatsLabel">Chưa tải</div>
+    </div>
+  </div>
+
+
+<div id="taxModal" class="fixed inset-0 bg-black/50 hidden z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
+    <h3 class="font-bold text-slate-900 text-[16px]">Ghi nhận nộp thuế</h3>
+    <p class="text-[13px] text-slate-500 mt-1">Lưu vào bảng <code>log_nop_thue</code> trong khachhang.db • Kỳ hiện tại: <b id="taxModalPeriod">...</b></p>
+    <div class="grid grid-cols-2 gap-3 mt-4">
+      <div><label class="text-[11px] font-semibold text-slate-500">KỲ (VD: Tháng 7/2026)</label><input id="taxKy" class="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px]" value="Tháng 7/2026"></div>
+      <div><label class="text-[11px] font-semibold text-slate-500">NGÀY NỘP (dd/mm/yyyy)</label><input id="taxNgayNop" type="date" class="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px]"></div>
+      <div class="col-span-2"><label class="text-[11px] font-semibold text-slate-500">DOANH THU KỲ NÀY (đ)</label><input id="taxDoanhThu" type="number" class="mt-1 w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[13px] font-bold"></div>
+      <div><label class="text-[11px] font-semibold text-slate-500">THUẾ GTGT</label><input id="taxGTGT" type="number" class="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px]"></div>
+      <div><label class="text-[11px] font-semibold text-slate-500">THUẾ TNCN</label><input id="taxTNCN" type="number" class="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px]"></div>
+      <div class="col-span-2"><label class="text-[11px] font-semibold text-slate-500">GHI CHÚ</label><input id="taxGhiChu" class="mt-1 w-full px-3 py-2.5 border border-slate-200 rounded-xl text-[13px]" placeholder="Nộp thuế tháng 7..."></div>
+    </div>
+    <div class="flex gap-2 mt-5"><button onclick="closeTaxModal()" class="flex-1 py-2.5 border border-slate-200 rounded-xl text-[13px]">Hủy</button><button onclick="submitTax()" class="flex-1 py-2.5 bg-blue-600 text-white rounded-xl text-[13px] font-semibold">Lưu nộp thuế</button></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+
+<script>
+function fmt(n) { return (Number(n) || 0).toLocaleString('vi-VN') + '₫'; }
+function fmtNum(n) { return (Number(n) || 0).toLocaleString('vi-VN'); }
+function fmtDDMMYYYY(iso) { if (!iso) return ''; const p=iso.split('-'); if(p.length===3) return p[2]+'/'+p[1]+'/'+p[0]; return iso; }
+function todayISO() { return new Date().toISOString().split('T')[0]; }
+function firstDayOfMonthISO(y,m){ return y+'-'+String(m).padStart(2,'0')+'-01'; }
+function lastDayOfMonthISO(y,m){ return new Date(y,m,0).toISOString().split('T')[0]; }
+const availableYears = {{ available_years|default([2024,2025,2026])|tojson }};
+const yearSelect=document.getElementById('yearSelect');
+const quarterSelect=document.getElementById('quarterSelect');
+const monthSelect=document.getElementById('monthSelect');
+const dateFrom=document.getElementById('dateFrom');
+const dateTo=document.getElementById('dateTo');
+const fromDisplay=document.getElementById('fromDisplay');
+const toDisplay=document.getElementById('toDisplay');
+const rangeLabel=document.getElementById('rangeLabel');
+function populateYears(){
+  yearSelect.innerHTML='';
+  availableYears.slice().sort((a,b)=>b-a).forEach(y=>{ const opt=document.createElement('option'); opt.value=y; opt.textContent='Năm '+y; yearSelect.appendChild(opt); });
+  const curY=new Date().getFullYear();
+  if(!availableYears.includes(curY)){ const opt=document.createElement('option'); opt.value=curY; opt.textContent='Năm '+curY; yearSelect.insertBefore(opt, yearSelect.firstChild); }
+  yearSelect.value=curY; monthSelect.value=new Date().getMonth()+1; quarterSelect.value=Math.floor(new Date().getMonth()/3)+1;
+}
+populateYears();
+let currentFilter={type:'month'};
+function updateDateDisplays(){
+  fromDisplay.textContent=dateFrom.value?fmtDDMMYYYY(dateFrom.value):'dd/mm/yyyy';
+  toDisplay.textContent=dateTo.value?fmtDDMMYYYY(dateTo.value):'dd/mm/yyyy';
+  const f=dateFrom.value?fmtDDMMYYYY(dateFrom.value):'...'; const t=dateTo.value?fmtDDMMYYYY(dateTo.value):'...';
+  rangeLabel.innerHTML='Đang xem: <b class="text-slate-900">'+f+' - '+t+'</b>';
+  const revSub=document.getElementById('revSub'); if(revSub) revSub.textContent=f+' - '+t;
+  const s2aKy=document.getElementById('s2aKyKeKhai'); if(s2aKy) s2aKy.textContent=f+' - '+t;
+  const chartRange=document.getElementById('chartRangeLabel'); if(chartRange) chartRange.textContent=f+' - '+t;
+  const taxModalPeriod=document.getElementById('taxModalPeriod'); if(taxModalPeriod) taxModalPeriod.textContent=f+' - '+t;
+  const type=currentFilter.type;
+  if(type==='month'){ document.getElementById('labelRev').textContent='DOANH THU THÁNG NÀY'; document.getElementById('labelCount').textContent='SỐ ĐƠN THÁNG NÀY'; document.getElementById('labelTax').textContent='DỰ TOÁN THUẾ THÁNG NÀY'; document.getElementById('labelAvg').textContent='TB MỖI ĐƠN THÁNG NÀY'; }
+  else if(type==='quarter'){ document.getElementById('labelRev').textContent='DOANH THU QUÝ NÀY'; document.getElementById('labelCount').textContent='SỐ ĐƠN QUÝ NÀY'; document.getElementById('labelTax').textContent='DỰ TOÁN THUẾ QUÝ NÀY'; document.getElementById('labelAvg').textContent='TB MỖI ĐƠN QUÝ NÀY'; }
+  else if(type==='year'){ document.getElementById('labelRev').textContent='DOANH THU NĂM NAY'; document.getElementById('labelCount').textContent='SỐ ĐƠN NĂM NAY'; document.getElementById('labelTax').textContent='DỰ TOÁN THUẾ NĂM NAY'; document.getElementById('labelAvg').textContent='TB MỖI ĐƠN NĂM NAY'; }
+  else { document.getElementById('labelRev').textContent='DOANH THU KỲ NÀY'; document.getElementById('labelCount').textContent='SỐ ĐƠN KỲ NÀY'; document.getElementById('labelTax').textContent='DỰ TOÁN THUẾ KỲ NÀY'; document.getElementById('labelAvg').textContent='TB MỖI ĐƠN KỲ NÀY'; }
+}
+function applyQuickFilter(type){
+  currentFilter.type=type; const now=new Date(); const curY=parseInt(yearSelect.value)||now.getFullYear(); const curM=parseInt(monthSelect.value)||(now.getMonth()+1); const curQ=parseInt(quarterSelect.value)||(Math.floor(now.getMonth()/3)+1);
+  let from,to;
+  if(type==='all'){ from='2024-01-01'; to=todayISO(); }
+  else if(type==='year'){ from=curY+'-01-01'; to=curY+'-12-31'; if(curY===now.getFullYear()) to=todayISO(); }
+  else if(type==='quarter'){ const qMap={1:['01-01','03-31'],2:['04-01','06-30'],3:['07-01','09-30'],4:['10-01','12-31']}; const se=qMap[curQ]; from=curY+'-'+se[0]; to=curY+'-'+se[1]; if(curY===now.getFullYear() && new Date(to)>now) to=todayISO(); }
+  else if(type==='month'){ from=firstDayOfMonthISO(curY,curM); to=lastDayOfMonthISO(curY,curM); if(curY===now.getFullYear() && curM===(now.getMonth()+1)) to=todayISO(); }
+  dateFrom.value=from; dateTo.value=to; updateDateDisplays(); loadAllReports();
+}
+document.querySelectorAll('.q-filter').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.q-filter').forEach(b=>{ b.classList.remove('active','bg-blue-600','text-white','border-blue-600','shadow-sm'); b.classList.add('bg-white','text-slate-700','border-slate-200'); });
+    btn.classList.add('active','bg-blue-600','text-white','border-blue-600','shadow-sm'); btn.classList.remove('bg-white','text-slate-700','border-slate-200');
+    const type=btn.dataset.filter;
+    yearSelect.classList.toggle('hidden', type==='all'); quarterSelect.classList.toggle('hidden', type!=='quarter'); monthSelect.classList.toggle('hidden', type!=='month' && type!=='quarter' && type!=='year'); if(type==='all') monthSelect.classList.add('hidden');
+    applyQuickFilter(type);
+  });
+});
+yearSelect.addEventListener('change', ()=>{ if(currentFilter.type!=='all') applyQuickFilter(currentFilter.type); });
+quarterSelect.addEventListener('change', ()=>{ if(currentFilter.type==='quarter') applyQuickFilter('quarter'); });
+monthSelect.addEventListener('change', ()=>{ applyQuickFilter(currentFilter.type); });
+function applyCustomDate(){ if(!dateFrom.value||!dateTo.value) return alert('Chọn đủ từ ngày - đến ngày'); currentFilter.type='custom'; document.querySelectorAll('.q-filter').forEach(b=>{ b.classList.remove('active','bg-blue-600','text-white','border-blue-600'); b.classList.add('bg-white','text-slate-700','border-slate-200'); }); updateDateDisplays(); loadAllReports(); }
+dateFrom.addEventListener('change', updateDateDisplays); dateTo.addEventListener('change', updateDateDisplays);
+const tabBtns=document.querySelectorAll('.tab-btn');
+const panes={summary:document.getElementById('tab-summary'), s2a:document.getElementById('tab-s2a'), customers:document.getElementById('tab-customers'), kho:document.getElementById('tab-kho')};
+tabBtns.forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    tabBtns.forEach(b=>{ b.classList.remove('active','bg-white','shadow-sm','text-slate-900','font-semibold'); b.classList.add('text-slate-600'); });
+    btn.classList.add('active','bg-white','shadow-sm','text-slate-900','font-semibold'); btn.classList.remove('text-slate-600');
+    Object.values(panes).forEach(p=>{ if(p) p.classList.add('hidden'); }); if(panes[btn.dataset.tab]) panes[btn.dataset.tab].classList.remove('hidden');
+    if(btn.dataset.tab==='customers'){ loadTopCustomers(); loadInactiveCustomers(); }
+    if(btn.dataset.tab==='kho') fetchTongHopDon();
+  });
+});
+let dailyChart=null;
+let currentSummaryData = null; // THÊM: lưu summary để S2a dùng chung
+function setText(id,text){ const el=document.getElementById(id); if(el) el.textContent=text; }
+function setVal(id,val){ const el=document.getElementById(id); if(el) el.value=val; }
+async function loadAllReports(){
+  const from=dateFrom.value, to=dateTo.value; if(!from||!to) return; updateDateDisplays();
+  try{
+    const res=await fetch('/api/reports/summary?from='+from+'&to='+to); const data=await res.json();
+    if(data.summary){
+      const s=data.summary;
+      setText('sumRev', fmt(s.revenue)); setText('sumCount', s.total_count||0); setText('daDoiSoat', s.total_count||0); setText('sumTax', fmt(s.tax||0)); setText('sumAvg', fmt(s.avg_order||0));
+      const avgSpPerOrder = s.total_count && data.kho ? (data.kho.tong_sp / s.total_count).toFixed(1) : 0;
+      setText('avgSub', (s.total_count||0)+' đơn • TB '+avgSpPerOrder+' SP/đơn');
+      const taxDetailEl=document.getElementById('taxRateDetail');
+      if(taxDetailEl){ if(s.vat_tax>0 || s.pit_tax>0) taxDetailEl.textContent='GTGT: '+fmt(s.vat_tax||0)+' + TNCN: '+fmt(s.pit_tax||0)+' • '+(s.vat_rate*100).toFixed(1)+'% + '+(s.pit_rate*100).toFixed(1)+'%'; else taxDetailEl.textContent='Miễn thuế (Dưới ngưỡng quy định)'; }
+      setVal('taxDoanhThu', Math.round(s.revenue||0)); setVal('taxGTGT', Math.round(s.vat_tax||0)); setVal('taxTNCN', Math.round(s.pit_tax||0));
+      // THÊM: Lưu lại để S2a dùng chung
+      currentSummaryData = data;
+      // Đổ vào box tổng hợp S2a (đồng bộ)
+      setText('s2aGroupName', s.group_name || '');
+      setText('s2aGroupNote', s.note || '');
+      setText('s2aTotalRev', fmt(s.revenue));
+      setText('s2aTotalTax', fmt(s.tax||0));
+      setText('s2aVatTax', fmt(s.vat_tax||0));
+      setText('s2aPitTax', fmt(s.pit_tax||0));
+      document.getElementById('s2aVatRate').textContent = (s.vat_rate*100).toFixed(1) + '%';
+      document.getElementById('s2aPitRate').textContent = (s.pit_rate*100).toFixed(1) + '%';
+      if(data.year_progress){
+        // nếu nhóm 1 thì ép S2a về 0 luôn
+        if(s.vat_rate===0 && s.pit_rate===0){
+          document.getElementById('s2aSummaryBox').className = "mt-6 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-";
+        } else {
+          document.getElementById('s2aSummaryBox').className = "mt-6 p-4 bg-blue-50 border border-blue-200 rounded-xl text-";
+        }
+      }
+    }
+    if(data.daily){ const labels=data.daily.map(d=>d.date.split('-').slice(0,2).join('/')); const values=data.daily.map(d=>d.revenue); renderChart(labels, values); }
+    if(data.customers){
+      const topList=document.getElementById('topCustomersList');
+      if(topList){ if(data.customers.length===0) topList.innerHTML='<div class="text-center py-8 text-slate-400 text-sm">Không có dữ liệu kỳ này</div>'; else topList.innerHTML=data.customers.slice(0,5).map((c,i)=>'<div class="flex items-center justify-between py-2.5 border-b border-slate-50 last:border-0"><div class="flex items-center gap-2.5"><div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">'+(i+1)+'</div><div><div class="text-[13px] font-medium text-slate-900">'+c.nickname+'</div><div class="text-[11px] text-slate-500">'+c.count+' đơn</div></div></div><div class="text-[13px] font-bold">'+fmt(c.total)+'</div></div>').join(''); }
+    }
+    if(data.year_progress){
+      const yp=data.year_progress;
+      setText('namLuyKeTienDo', yp.year);
+      setText('yearLabel', yp.year);
+      setText('todayLabel', yp.today_ddmmyyyy||'');
+      setText('textLuyKeHienTai', fmt(yp.luy_ke));
+      setText('textConLaiSangNguong', fmt(yp.con_lai));
+      setText('textNguongMax', fmt(yp.nguong_max));
+      const conLaiText = document.getElementById('conLaiText');
+      if(conLaiText) conLaiText.innerHTML = `Còn lại: <b class="text-amber-600">${fmt(yp.con_lai)}</b> nữa sang ngưỡng mới`;
+      const phanTramText = document.getElementById('phanTramText');
+      if(phanTramText) phanTramText.textContent = (yp.phan_tram||0).toFixed(1) + '%';
+      const thanh = document.getElementById('thanhTienDo');
+      if(thanh){
+        thanh.style.width = (yp.phan_tram||0) + '%';
+        // Đổi màu khi gần ngưỡng: <50% xanh, 50-80% vàng, >80% đỏ
+        if(yp.phan_tram>80) thanh.className = "h-full bg-gradient-to-r from-red-500 to-amber-500 rounded-full transition-all duration-700";
+        else if(yp.phan_tram>50) thanh.className = "h-full bg-gradient-to-r from-amber-500 to-yellow-500 rounded-full transition-all duration-700";
+        else thanh.className = "h-full bg-gradient-to-r from-blue-600 to-indigo-600 rounded-full transition-all duration-700";
+      }
+      const groupBadge=document.getElementById('badgeTenNhom'); if(groupBadge) groupBadge.textContent='HKD thuộc '+(yp.group_name||'nhóm...');
+      const alertBox=document.getElementById('khuVucCanhBao'); if(alertBox){ if(yp.note) alertBox.innerHTML=`<div class="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-900 flex items-start gap-2.5"><i class="bi bi-info-circle-fill text-amber-600 mt-0.5 text-base flex-shrink-0"></i><div>${yp.note}</div></div>`; else alertBox.innerHTML=`<div class="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-900 flex items-center gap-2"><i class="bi bi-info-circle-fill text-blue-600 text-base"></i><span>Lũy kế năm ${yp.year} từ 01/01 đến ${yp.today_ddmmyyyy||''}: <b>${fmt(yp.luy_ke)}</b>. Còn <b>${fmt(yp.con_lai)}</b> nữa sang ngưỡng mới.</span></div>`; }
+    }
+    if(data.s2a) renderS2aBody(data.s2a);
+    if(data.kho){ setText('khoTongDonKho', data.kho.tong_don||0); setText('khoTongSPKho', data.kho.tong_sp||0); }
+    if(data.tax_logs){ const tbody=document.getElementById('taxLogBody'); if(tbody){ if(data.tax_logs.length===0) tbody.innerHTML='<tr><td colspan=7 class="text-center py-6 text-slate-400">Chưa có lịch sử nộp thuế năm nay</td></tr>'; else tbody.innerHTML=data.tax_logs.map(r=>{ const ngay=r.ngay_nop?fmtDDMMYYYY(r.ngay_nop):''; const tongThue=Number(r.thue_gtgt||0)+Number(r.thue_tncn||0); return '<tr class="hover:bg-slate-50"><td class="px-3 py-2">'+ngay+'</td><td class="px-3 py-2">'+(r.ky||'')+'</td><td class="px-3 py-2 text-right font-medium">'+fmt(r.doanh_thu)+'</td><td class="px-3 py-2 text-right">'+fmt(r.doanh_thu_luy_ke)+'</td><td class="px-3 py-2 text-right">'+fmt(r.thue_gtgt)+'</td><td class="px-3 py-2 text-right text-red-600">'+fmt(r.thue_tncn)+'</td><td class="px-3 py-2 text-right font-bold text-red-600">'+fmt(tongThue)+'</td></tr>'; }).join(''); } }
+  }catch(e){ console.error("Load reports error:", e); }
+}
+async function loadBusinessProfile(){ try{ const res=await fetch('/api/business_profile'); const data=await res.json(); if(data){ const el1=document.getElementById('hkd_name'); if(el1) el1.textContent=data.name||''; const el2=document.getElementById('hkd_tax'); if(el2) el2.textContent=data.tax_id||''; const el3=document.getElementById('hkd_address'); if(el3) el3.textContent=data.address||''; const el4=document.getElementById('hkd_career'); if(el4) el4.textContent=data.career||''; } }catch(e){ console.error(e); } }
+document.addEventListener('DOMContentLoaded', loadBusinessProfile);
+function renderChart(labels, values){ const ctx=document.getElementById('dailyChart'); if(!ctx) return; if(dailyChart) dailyChart.destroy(); dailyChart=new Chart(ctx, {type:'bar', data:{labels:labels, datasets:[{label:'Doanh thu', data:values, backgroundColor:'#2563eb', borderRadius:8, barThickness:18}]}, options:{responsive:true, plugins:{legend:{display:false}, tooltip:{callbacks:{label:(ctx)=>fmt(ctx.parsed.y)}}}, scales:{y:{beginAtZero:true, grid:{color:'#f1f5f9'}, ticks:{callback:(v)=>(v/1000000).toFixed(1)+'M'}}, x:{grid:{display:false}}}}}); }
+
+let allCustomersCache = [];
+async function loadTopCustomers(){
+  const tbody=document.getElementById('top20Body'); tbody.innerHTML='<tr><td colspan="5" class="text-center py-10 text-slate-400">Đang tải từ doisoat toàn thời gian...</td></tr>';
+  try{
+    const res=await fetch('/api/reports/customers'); const data=await res.json();
+    const customers = data.customers || data.top20 || []; allCustomersCache = customers;
+    const top20 = data.top20 || customers.slice(0,20);
+    if(top20.length===0){ tbody.innerHTML='<tr><td colspan="5" class="text-center py-10 text-slate-400">Không có dữ liệu doisoat</td></tr>'; return; }
+    let html=''; top20.forEach((c, idx)=>{ html+='<tr class="hover:bg-slate-50"><td class="px-3 py-2.5 text-center font-bold '+(idx<3?'text-amber-600':'')+'">'+(idx+1)+'</td><td class="px-3 py-2.5 font-bold text-slate-900">'+c.nickname+'</td><td class="px-3 py-2.5 text-slate-600">'+(c.username||'')+'</td><td class="px-3 py-2.5 text-center"><span class="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">'+c.order_count+'</span></td><td class="px-3 py-2.5 text-right font-bold text-emerald-700">'+fmt(c.total_payment||c.total_price||0)+'</td></tr>'; });
+    tbody.innerHTML=html; document.getElementById('top20Stats').innerHTML='Tổng: <b>'+customers.length+'</b> khách hàng toàn thời gian • Top 20 chiếm <b>'+fmt(top20.reduce((s,x)=>s+(x.total_payment||0),0))+'</b> doanh thu';
+  }catch(e){ tbody.innerHTML='<tr><td colspan="5" class="text-center py-10 text-red-400">Lỗi tải dữ liệu</td></tr>'; }
+}
+function renderLiveSearch(q){
+  const container=document.getElementById('liveSearchResult'); const tbody=document.getElementById('liveSearchBody');
+  if(!q){ container.classList.add('hidden'); return; }
+  const filtered = allCustomersCache.filter(c=> c.nickname.toLowerCase().includes(q.toLowerCase()) || (c.username||'').toLowerCase().includes(q.toLowerCase()));
+  if(filtered.length===0){ tbody.innerHTML='<tr><td colspan="6" class="text-center py-6 text-slate-400">Không tìm thấy khách hàng nào</td></tr>'; container.classList.remove('hidden'); return; }
+  let html=''; filtered.slice(0,50).forEach((c, idx)=>{ html+='<tr class="hover:bg-blue-50/50"><td class="px-3 py-2.5">'+(idx+1)+'</td><td class="px-3 py-2.5 font-bold text-slate-900">'+c.nickname+'</td><td class="px-3 py-2.5">'+(c.username||'')+'</td><td class="px-3 py-2.5 text-center font-semibold">'+c.order_count+'</td><td class="px-3 py-2.5 text-right font-bold text-emerald-700">'+fmt(c.total_payment)+'</td><td class="px-3 py-2.5 text-center text-[12px]">'+(c.last_date||'')+'</td></tr>'; });
+  tbody.innerHTML=html; container.classList.remove('hidden');
+}
+document.getElementById('searchCustomerLive')?.addEventListener('input', function(e){ const q=e.target.value.trim(); if(!allCustomersCache.length){ loadTopCustomers().then(()=>renderLiveSearch(q)); } else { renderLiveSearch(q); } });
+async function loadInactiveCustomers(){
+  const monthsInput=document.getElementById('inactiveMonths'); const months=parseInt(monthsInput.value)||3;
+  const tbody=document.getElementById('inactiveBody'); tbody.innerHTML='<tr><td colspan="8" class="text-center py-10 text-slate-400">Đang lọc khách không mua trong '+months+' tháng...</td></tr>';
+  try{
+    const res=await fetch('/api/reports/customers/inactive?months='+months); const data=await res.json(); const list=data.inactive||[];
+    if(list.length===0){ tbody.innerHTML='<tr><td colspan="8" class="text-center py-10 text-slate-400">Không có khách nào chưa mua trong '+months+' tháng qua - tất cả đều active!</td></tr>'; document.getElementById('inactiveStats').innerHTML='<i class="bi bi-check-circle-fill"></i> Tất cả khách hàng đều đã mua trong '+months+' tháng trở lại đây.'; return; }
+    let html=''; list.slice(0,100).forEach((c, idx)=>{ let badge='bg-slate-100 text-slate-700'; let tip='Gửi tin nhắn hỏi thăm'; if(c.days_inactive>180){ badge='bg-red-100 text-red-700'; tip='Ưu đãi lớn + gọi điện'; } else if(c.days_inactive>90){ badge='bg-amber-100 text-amber-700'; tip='Mã giảm giá 10-15%'; } else if(c.days_inactive>60){ badge='bg-blue-100 text-blue-700'; tip='Nhắc nhẹ + voucher'; } html+='<tr class="hover:bg-slate-50"><td class="px-3 py-2.5 text-center">'+(idx+1)+'</td><td class="px-3 py-2.5 font-bold text-slate-900">'+c.nickname+'</td><td class="px-3 py-2.5">'+(c.username||'')+'</td><td class="px-3 py-2.5 text-center font-mono text-[12px]">'+(c.last_date||'')+'</td><td class="px-3 py-2.5 text-center"><span class="px-2 py-0.5 rounded-full text-xs font-bold '+badge+'">'+(c.days_inactive||0)+' ngày</span></td><td class="px-3 py-2.5 text-right font-bold">'+fmt(c.total_payment)+'</td><td class="px-3 py-2.5 text-center">'+c.order_count+'</td><td class="px-3 py-2.5 text-center"><span class="text-[11px] px-2 py-1 bg-slate-900 text-white rounded-full">'+tip+'</span></td></tr>'; }); tbody.innerHTML=html;
+    document.getElementById('inactiveStats').innerHTML='Tìm thấy <b class="text-red-600">'+list.length+'</b> khách chưa mua trong <b>'+months+' tháng</b>. Gợi ý chăm sóc ngay.';
+  }catch(e){ tbody.innerHTML='<tr><td colspan="8" class="text-center py-10 text-red-400">Lỗi tải dữ liệu</td></tr>'; }
+}
+function tipForMonths(m){ if(m<=1) return "Nhắc khách vừa mua, xin feedback"; if(m<=3) return "Gửi voucher quay lại"; return "Chiến dịch winback - ưu đãi mạnh"; }
+
+let khoRawData = [];
+function renderKhoTable(){
+  const tbody=document.getElementById('khoBody');
+  const filterType=document.getElementById('khoFilterType').value;
+  const sortType=document.getElementById('khoSortType').value;
+  const searchQ=(document.getElementById('khoSearch').value||'').toLowerCase().trim();
+  let filtered = [...khoRawData];
+  if(searchQ){ filtered = filtered.filter(d=> (d.nickname||'').toLowerCase().includes(searchQ) || (d.username||'').toLowerCase().includes(searchQ)); }
+  if(filterType==='nococ'){ filtered = filtered.filter(d=> (d.deposit||0)===0); }
+  else if(filterType==='coc_duoi_100k'){ filtered = filtered.filter(d=> (d.deposit||0)>0 && (d.deposit||0)<100000); }
+  else if(filterType==='chua_the_di'){ filtered = filtered.filter(d=>{ const con_thieu=(d.total_price||0)-(d.deposit||0); return con_thieu <= -19000; }); }
+  else if(filterType==='co_the_di'){ filtered = filtered.filter(d=>{ const con_thieu=(d.total_price||0)-(d.deposit||0); return con_thieu >= -19000; }); }
+  if(sortType==='gia_giam') filtered.sort((a,b)=> (b.total_price||0)-(a.total_price||0));
+  else if(sortType==='gia_tang') filtered.sort((a,b)=> (a.total_price||0)-(b.total_price||0));
+  else if(sortType==='sl_giam') filtered.sort((a,b)=> (b.order_count||0)-(a.order_count||0));
+  else if(sortType==='sl_tang') filtered.sort((a,b)=> (a.order_count||0)-(b.order_count||0));
+  if(filtered.length===0){ tbody.innerHTML='<tr><td colspan="8" class="text-center py-10 text-slate-400">Không có đơn nào thỏa mãn bộ lọc</td></tr>'; document.getElementById('khoStatsLabel').innerHTML='Bộ lọc: <b>'+filterType+'</b> • Sắp xếp: <b>'+sortType+'</b> • Kết quả: 0 đơn'; return; }
+  let t_money=0, t_deposit=0, t_orders=0; let html='';
+  filtered.forEach((d,idx)=>{
+    t_money+=d.total_price||0; t_deposit+=d.deposit||0; t_orders+=d.order_count||0;
+    const con_thieu=(d.total_price||0)-(d.deposit||0);
+    const maDonList = (d.order_ids || []).map(id => { const s=String(id); return s.substring(0,8); });
+    const maDonDisplay = maDonList.map(m => '<span class="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded mr-1 inline-block mb-1">'+m+'</span>').join('');
+    html+='<tr class="hover:bg-slate-50"><td class="px-3 py-2.5">'+(idx+1)+'</td><td class="px-3 py-2.5 font-bold text-blue-600">'+d.nickname+'</td><td class="px-3 py-2.5">'+d.username+'</td><td class="px-3 py-2.5 text-right font-bold">'+fmt(d.total_price)+'</td><td class="px-3 py-2.5 text-right text-emerald-600 font-bold">'+fmt(d.deposit)+'</td><td class="px-3 py-2.5 text-right font-bold '+(con_thieu<=-19000?'text-emerald-600':'text-red-600')+'">'+fmt(con_thieu)+'</td><td class="px-3 py-2.5"><div class="flex flex-wrap max-w-[220px]">'+maDonDisplay+'</div></td><td class="px-3 py-2.5 text-center"><span class="px-2 py-0.5 bg-slate-100 rounded-full text-xs">'+d.order_count+'</span></td></tr>';
+  });
+  tbody.innerHTML=html;
+  document.getElementById('khoStatsLabel').innerHTML='Hiển thị: <b>'+filtered.length+'</b> khách / Tổng: <b>'+khoRawData.length+'</b> khách • Đã chốt <b>'+t_orders+'</b> đơn • Tổng tiền: <b>'+fmt(t_money)+'</b> • Cọc: <b>'+fmt(t_deposit)+'</b>';
+}
+async function fetchTongHopDon(){
+  const tbody=document.getElementById('khoBody'); tbody.innerHTML='<tr><td colspan="8" class="text-center py-10 text-slate-400">Đang tải kho từ tonghopdon...</td></tr>';
+  try{
+    const res=await fetch('/api/reports/tonghop_don'); const data=await res.json(); khoRawData = data||[];
+    if(khoRawData.length>0){
+      const totalOrders = khoRawData.reduce((s,x)=>s+(x.order_count||0),0);
+      const totalMoney = khoRawData.reduce((s,x)=>s+(x.total_price||0),0);
+      setText('khoTongDonKho', totalOrders); setText('khoTongSPKho', totalOrders);
+      setText('khoTongDonKhoSub', khoRawData.length+' khách • '+fmt(totalMoney)+' tổng');
+      setText('khoTongSPKhoSub', totalOrders+' sản phẩm • Đang Dồn');
+    } else { setText('khoTongDonKho', 0); setText('khoTongSPKho', 0); }
+    renderKhoTable();
+  }catch(e){ tbody.innerHTML='<tr><td colspan="8" class="text-center py-10 text-red-400">Lỗi tải kho</td></tr>'; }
+}
+document.getElementById('khoFilterType')?.addEventListener('change', renderKhoTable);
+document.getElementById('khoSortType')?.addEventListener('change', renderKhoTable);
+document.getElementById('khoSearch')?.addEventListener('input', renderKhoTable);
+
+function openTaxModal(){ document.getElementById('taxModal').classList.remove('hidden'); document.getElementById('taxNgayNop').value=todayISO(); }
+function closeTaxModal(){ document.getElementById('taxModal').classList.add('hidden'); }
+async function submitTax(){
+  const yearVal=parseInt(yearSelect.value)||new Date().getFullYear();
+  const payload={ ky:document.getElementById('taxKy').value, ngay_nop:document.getElementById('taxNgayNop').value, doanh_thu:parseFloat(document.getElementById('taxDoanhThu').value)||0, thue_gtgt:parseFloat(document.getElementById('taxGTGT').value)||0, thue_tncn:parseFloat(document.getElementById('taxTNCN').value)||0, ghi_chu:document.getElementById('taxGhiChu').value, nam:yearVal };
+  if(!payload.ky||!payload.ngay_nop||!payload.doanh_thu) return alert('Điền đủ Kỳ, Ngày nộp, Doanh thu');
+  try{ const res=await fetch('/api/taxes/pay', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)}); const result=await res.json(); if(result.status==='success'){ alert('Đã ghi nhận nộp thuế!'); closeTaxModal(); loadAllReports(); } else alert('❌ '+(result.error||'Lỗi')); }catch(e){ alert('Lỗi kết nối'); }
+}
+function exportExcel(){ const from=dateFrom.value, to=dateTo.value; window.location.href='/api/reports/summary?from='+from+'&to='+to; }
+
+function exportS2aToPDF(){
+  const from = document.getElementById('dateFrom').value;
+  const to = document.getElementById('dateTo').value;
+  if(!from || !to) return alert('Chọn khoảng thời gian trước khi xuất PDF');
+  window.location.href = `/api/s2a/export-pdf?from=${from}&to=${to}`;
+}
+
+
+
+
+
+function renderS2aBody(data){
+  const tbody=document.getElementById('s2aBody');
+  const tfoot=document.getElementById('s2aFoot');
+  if(!tbody) return;
+  tbody.innerHTML=''; if(tfoot) tfoot.innerHTML='';
+
+  let orders = [];
+  let vatRate = 0, pitRate = 0;
+  let pctGTGT = 0, pctTNCN = 0;
+
+  if(currentSummaryData && currentSummaryData.summary){
+    vatRate = currentSummaryData.summary.vat_rate || 0;
+    pitRate = currentSummaryData.summary.pit_rate || 0;
+    pctGTGT = (vatRate*100).toFixed(1);
+    pctTNCN = (pitRate*100).toFixed(1);
+  }
+
+  // data có thể là mảng cũ từ summary hoặc object mới từ /api/s2a/data
+  if(Array.isArray(data)){
+    orders = data.map(r=>({
+      tracking_number: r.tracking_number || r.order_id || '',
+      date: r.date ? r.date.replace(/-/g, '/').split('/').reverse().join('/') : '',
+      dien_giai: 'Bán hàng cho ' + (r.nickname||''),
+      total_payment: r.revenue || r.total_payment || 0
+    }));
+  }
+    else if(data && data.orders){
+    orders = data.orders;
+    if(data.pct_gtgt!==undefined) { vatRate = data.pct_gtgt/100; pctGTGT = data.pct_gtgt; }
+    if(data.pct_tncn!==undefined) { pitRate = data.pct_tncn/100; pctTNCN = data.pct_tncn; }
+    const nL = document.getElementById('s2aNgayLap');
+    if(nL && data.ngay_lap){ 
+      nL.textContent=data.ngay_lap; 
+      const tL = document.getElementById('s2aThangLap'); if(tL) tL.textContent=data.thang_lap;
+      const namL = document.getElementById('s2aNamLap'); if(namL) namL.textContent=data.nam_lap;
+    }
+  }
+
+  // Lấy ngành nghề an toàn
+  let career = 'Kinh doanh bán buôn, bán lẻ hàng hóa';
+  const careerEl = document.getElementById('hkd_career');
+  if(careerEl && careerEl.textContent) career = careerEl.textContent.replace(/`/g, "'").trim();
+
+  let html = '';
+  html += `<tr><td></td><td></td><td style="font-weight:bold;">1. Ngành nghề: ${career}</td><td></td></tr>`;
+
+  if(orders.length===0){
+    html += `<tr><td colspan="4" style="text-align:center; padding:12px; color:#666;">Không có dữ liệu trong kỳ ${document.getElementById('s2aKyKeKhai')?document.getElementById('s2aKyKeKhai').textContent:''}</td></tr>`;
+    tbody.innerHTML = html;
+    if(tfoot) tfoot.innerHTML = '';
+    return;
+  }
+
+  orders.forEach(item=>{
+    const soTien = Number(item.total_payment||0);
+    // Chuyển item.date về dd/mm/yyyy nếu nó vẫn đang dạng yyyy/mm/dd
+    const formattedDate = item.date ? item.date.replace(/-/g, '/').split('/').reverse().join('/') : '';
+
+    html += `<tr>
+      <td style="text-align:center; font-size:12px;">${item.tracking_number||''}</td>
+      <td style="text-align:center;">${formattedDate}</td>
+      <td>${item.dien_giai||''}</td>
+      <td style="text-align:right;">${soTien.toLocaleString('vi-VN')}</td>
+    </tr>`;
+  });
+
+  // Tổng đồng bộ với báo cáo tổng kết
+  let tong = 0, thueGTGT = 0, thueTNCN = 0;
+  if(currentSummaryData && currentSummaryData.summary){
+    tong = currentSummaryData.summary.revenue||0;
+    thueGTGT = currentSummaryData.summary.vat_tax||0;
+    thueTNCN = currentSummaryData.summary.pit_tax||0;
+  } else {
+    tong = orders.reduce((s,o)=>s+Number(o.total_payment||0),0);
+    thueGTGT = Math.round(tong*vatRate);
+    thueTNCN = Math.round(tong*pitRate);
+  }
+
+  html += `<tr><td></td><td></td><td style="font-weight:bold;">Tổng cộng (1)</td><td style="text-align:right; font-weight:bold;">${tong.toLocaleString('vi-VN')}</td></tr>`;
+  html += `<tr><td></td><td></td><td>Thuế GTGT (${pctGTGT}%)</td><td style="text-align:right;">${thueGTGT?thueGTGT.toLocaleString('vi-VN'):'-'}</td></tr>`;
+  html += `<tr><td></td><td></td><td>Thuế TNCN (${pctTNCN}%)</td><td style="text-align:right;">${thueTNCN?thueTNCN.toLocaleString('vi-VN'):'-'}</td></tr>`;
+  html += `<tr><td></td><td></td><td style="font-weight:bold;">Tổng số thuế GTGT phải nộp</td><td style="text-align:right; font-weight:bold;">${thueGTGT?thueGTGT.toLocaleString('vi-VN'):'-'}</td></tr>`;
+  html += `<tr><td></td><td></td><td style="font-weight:bold;">Tổng số thuế TNCN phải nộp</td><td style="text-align:right; font-weight:bold;">${thueTNCN?thueTNCN.toLocaleString('vi-VN'):'-'}</td></tr>`;
+
+  tbody.innerHTML = html;
+  if(tfoot) tfoot.innerHTML = '';
+}
+
+
+applyQuickFilter('month');
+</script>
+
+{% endblock %}
