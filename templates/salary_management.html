@@ -1,0 +1,419 @@
+{% extends "admin_base.html" %}
+{% block title %}Quản lý thanh toán lương - Biolinh 2Hand{% endblock %}
+{% block breadcrumb_parent %}Quản lý nhân viên{% endblock %}
+{% block breadcrumb_child %}Lịch sử thanh toán{% endblock %}
+{% block mobile_title %}Quản lý thanh toán{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <!-- HEADER & BUTTON QUAY LẠI -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <h2 class="text-xl font-bold text-slate-900">Nhật ký & Bảng kê thanh toán lương</h2>
+      <p class="text-sm text-slate-500 mt-1">Bức tranh toàn cảnh về chi trả thu nhập cho nhân sự theo thời gian</p>
+    </div>
+    <a href="{{ url_for('admin_dashboard') }}" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium transition flex items-center gap-2 w-fit">
+      <i class="bi bi-arrow-left"></i> Quay lại Dashboard
+    </a>
+  </div>
+
+  <!-- THỐNG KÊ TỔNG QUAN THÁNG -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+      <div class="text-[11px] tracking-widest text-slate-500 font-semibold uppercase">Tổng Chi Quỹ Lương</div>
+      <div class="text-2xl font-bold mt-2 text-blue-600">{{ "{:,.0f}".format(total_paid) }}₫</div>
+      <div class="text-[11px] text-slate-400 mt-1"><i class="bi bi-info-circle"></i> Thu nhập + Phát sinh thưởng</div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+      <div class="text-[11px] tracking-widest text-slate-500 font-semibold uppercase">Chi Trả Chính Thức</div>
+      <div class="text-2xl font-bold mt-2 text-slate-900">{{ "{:,.0f}".format(official_paid) }}₫</div>
+      <div class="text-[11px] text-slate-400 mt-1">Đã bao gồm tạm ứng/khấu trừ</div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+      <div class="text-[11px] tracking-widest text-slate-500 font-semibold uppercase">Chi Trả Part-Time</div>
+      <div class="text-2xl font-bold mt-2 text-amber-600">{{ "{:,.0f}".format(parttime_paid) }}₫</div>
+      <div class="text-[11px] text-slate-400 mt-1">Quỹ lương nhân sự theo giờ</div>
+    </div>
+
+    <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+      <div class="text-[11px] tracking-widest text-slate-500 font-semibold uppercase">Lượt Giao Dịch</div>
+      <div class="text-2xl font-bold mt-2 text-emerald-600">{{ total_transactions }}</div>
+      <div class="text-[11px] text-emerald-600 mt-1"><i class="bi bi-check-circle-fill"></i> Đã quyết toán xong</div>
+    </div>
+  </div>
+
+  <!-- BỘ LỌC THÁNG & LIVE SEARCH -->
+  <div class="p-4 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+    <form method="GET" class="flex items-center gap-2">
+      <label for="monthSelect" class="text-xs font-semibold text-slate-600">CHỌN THÁNG:</label>
+      <input type="month" id="monthSelect" name="month" value="{{ selected_month }}" onchange="this.form.submit()" class="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-blue-500">
+    </form>
+
+    <div class="relative">
+      <i class="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+      <input id="searchPayment" placeholder="Tìm tên, username, ngày..." class="pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm w-72 outline-none focus:ring-2 focus:ring-blue-500">
+    </div>
+  </div>
+
+  <!-- BẢNG KÊ CHI TIẾT THANH TOÁN -->
+  <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      <h3 class="font-bold text-slate-900 flex items-center gap-2">
+        <i class="bi bi-card-checklist text-blue-600"></i> Bảng kê chi tiết giao dịch
+      </h3>
+      <span class="text-xs bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full font-semibold">{{ payments|length }} bản ghi</span>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="bg-slate-50 text-[11px] tracking-widest text-slate-500 border-b border-slate-200">
+          <tr>
+            <th class="text-left font-semibold px-4 py-3">NGÀY TT</th>
+            <th class="text-left font-semibold px-4 py-3">NHÂN VIÊN</th>
+            <th class="text-left font-semibold px-4 py-3">LOẠI NHÂN SỰ</th>
+            <th class="text-left font-semibold px-4 py-3">ĐỊNH MỨC / ĐƠN GIÁ</th>
+            <th class="text-left font-semibold px-4 py-3">CÔNG / GIỜ LÀM</th>
+            <th class="text-left font-semibold px-4 py-3">THU NHẬP</th>
+            <th class="text-left font-semibold px-4 py-3">PHÁT SINH</th>
+            <th class="text-right font-semibold px-4 py-3">THỰC NHẬN</th>
+            <th class="text-center font-semibold px-4 py-3">THAO TÁC</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100 paymentTableBody">
+          {% if not payments %}
+            <tr>
+              <td colspan="9" class="text-center py-8 text-slate-400">
+                <div class="text-2xl mb-1">📄</div>Không tìm thấy dữ liệu thanh toán nào trong tháng {{ selected_month }}.
+              </td>
+            </tr>
+          {% else %}
+            {% for p in payments %}
+            <tr class="hover:bg-slate-50/80 transition">
+              <td class="px-4 py-3 font-medium text-slate-600"><code class="px-2 py-1 bg-slate-100 rounded text-xs">{{ p.payment_date }}</code></td>
+              <td class="px-4 py-3">
+                <div class="font-semibold text-slate-900">{{ p.hovaten }}</div>
+                <div class="text-xs text-slate-400">@{{ p.username }}</div>
+              </td>
+              <td class="px-4 py-3">
+                {% if p.chucdanh == 'parttime' %}
+                  <span class="px-2.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-[11px] font-medium">Part Time</span>
+                {% else %}
+                  <span class="px-2.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-[11px] font-medium">Chính thức</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 text-slate-600">
+                {% if p.chucdanh == 'parttime' %}
+                  {{ "{:,.0f}".format(p.luong_theo_gio or 0) }}₫/h
+                {% else %}
+                  {{ "{:,.0f}".format(p.luong_co_ban or 0) }}₫/tháng
+                {% endif %}
+              </td>
+              <td class="px-4 py-3">
+                {% if p.chucdanh == 'parttime' %}
+                  <span class="font-semibold text-amber-700">{{ "%.1f"|format(p.gio_lam or 0) }} giờ</span>
+                {% else %}
+                  <span class="font-semibold text-blue-700">{{ "%.1f"|format(p.tong_cong or 0) }} công</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 text-slate-600">{{ "{:,.0f}".format(p.thu_nhap_tinh or 0) }}₫</td>
+              <td class="px-4 py-3 font-bold {% if (p.tong_phat_sinh or 0) >= 0 %}text-emerald-600{% else %}text-red-600{% endif %}">
+                {{ "{:+,.0f}".format(p.tong_phat_sinh or 0) }}₫
+              </td>
+              <td class="px-4 py-3 text-right">
+                <span class="font-bold text-slate-900 text-base">{{ "{:,.0f}".format(p.thuc_nhan or 0) }}₫</span>
+              </td>
+              <td class="px-4 py-3 text-center">
+                <button type="button" 
+                  class="btn-open-payslip px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-semibold border border-blue-200 transition flex items-center gap-1 mx-auto"
+                  data-id="{{ p.id }}"
+                  data-hovaten="{{ p.hovaten }}"
+                  data-username="{{ p.username }}"
+                  data-chucdanh="{{ p.chucdanh }}"
+                  data-paymentdate="{{ p.payment_date }}"
+                  data-dongia="{% if p.chucdanh == 'parttime' %}{{ '{:,.0f}'.format(p.luong_theo_gio or 0) }}{% else %}{{ '{:,.0f}'.format(p.luong_co_ban or 0) }}{% endif %}"
+                  data-khoiluong="{% if p.chucdanh == 'parttime' %}{{ '%.1f'|format(p.gio_lam or 0) }}{% else %}{{ '%.1f'|format(p.tong_cong or 0) }}{% endif %}"
+                  data-donvi="{% if p.chucdanh == 'parttime' %}giờ{% else %}công{% endif %}"
+                  data-thunhap="{{ '{:,.0f}'.format(p.thu_nhap_tinh or 0) }}"
+                  data-phatsinh="{{ '{:+,.0f}'.format(p.tong_phat_sinh or 0) }}"
+                  data-thucnhan="{{ '{:,.0f}'.format(p.thuc_nhan or 0) }}"
+                  data-chitietps="{{ p.chi_tiet_ps or '[]' }}">
+                  <i class="bi bi-file-earmark-text"></i> Phiếu lương
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    <div class="p-3 bg-slate-50 border-t text-xs text-slate-500 flex justify-between">
+      <span>Hiển thị {{ payments|length }} bản ghi thanh toán</span>
+      <span class="flex items-center gap-1"><span class="w-2 h-2 bg-emerald-500 rounded-full"></span> Lịch sử đồng bộ realtime</span>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PHIẾU LƯƠNG -->
+<div id="payslipModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4 transition-all">
+  <div class="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full overflow-hidden transform transition-all">
+    
+    <div id="payslipCard" class="p-6 bg-white">
+      <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-blue-600 text-white font-black flex items-center justify-center text-lg shadow-md shadow-blue-500/20">B</div>
+          <div>
+            <h4 class="font-bold text-slate-900 text-base leading-tight">BIOLINH 2HAND</h4>
+            <p class="text-[11px] text-slate-400 uppercase tracking-widest font-medium">Phiếu thanh toán lương</p>
+          </div>
+        </div>
+        <span class="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[10px] font-bold uppercase tracking-wider">Đã quyết toán</span>
+      </div>
+
+      <div class="mt-4 bg-slate-50 rounded-2xl p-3.5 border border-slate-100 space-y-1.5">
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-slate-500">Họ Và Tên:</span>
+          <span class="font-bold text-slate-900" id="psHovaten">-</span>
+        </div>
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-slate-500">Tài khoản:</span>
+          <code class="text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded text-[11px]" id="psUsername">-</code>
+        </div>
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-slate-500">Vị trí:</span>
+          <span class="font-medium text-slate-700" id="psChucdanh">-</span>
+        </div>
+        <div class="flex justify-between items-center text-xs">
+          <span class="text-slate-500">Ngày thanh toán:</span>
+          <span class="font-semibold text-slate-700" id="psPaymentDate">-</span>
+        </div>
+      </div>
+
+      <div class="mt-4 space-y-2 text-xs">
+        <div class="flex justify-between items-center py-1.5 border-b border-slate-100">
+          <span class="text-slate-500">Mức lương (giờ/tháng):</span>
+          <span class="font-semibold text-slate-800"><span id="psDonGia">0</span>₫</span>
+        </div>
+        <div class="flex justify-between items-center py-1.5 border-b border-slate-100">
+          <span class="text-slate-500">Khối lượng làm việc:</span>
+          <span class="font-semibold text-slate-800"><span id="psKhoiLuong">0</span> <span id="psDonVi">công</span></span>
+        </div>
+        <div class="flex justify-between items-center py-1.5 border-b border-slate-100">
+          <span class="text-slate-500">Thu nhập ước tính:</span>
+          <span class="font-semibold text-slate-800"><span id="psThuNhap">0</span>₫</span>
+        </div>
+        <div class="flex justify-between items-center py-1.5 border-b border-slate-100">
+          <span class="text-slate-500">Khoản thưởng / Phạt phát sinh:</span>
+          <span class="font-bold" id="psPhatSinhContainer"><span id="psPhatSinh">0</span>₫</span>
+        </div>
+        <!-- KHỐI BẢNG BỔ SUNG: CHI TIẾT CÁC KHOẢN PHÁT SINH -->
+        <div id="psTableWrapper" class="mt-2 hidden">
+          <div class="text-[11px] font-semibold text-slate-500 mb-1 flex items-center gap-1">
+            <i class="bi bi-list-ul"></i> Chi tiết các khoản phát sinh:
+          </div>
+          <div class="max-h-36 overflow-y-auto border border-slate-200 rounded-xl bg-slate-50/50">
+            <table class="w-full text-[11px] text-left">
+              <thead class="bg-slate-100 text-slate-500 border-b border-slate-200 sticky top-0">
+                <tr>
+                  <th class="p-1.5 font-semibold">NGÀY</th>
+                  <th class="p-1.5 font-semibold">NỘI DUNG</th>
+                  <th class="p-1.5 font-semibold text-right">SỐ TIỀN</th>
+                </tr>
+              </thead>
+              <tbody id="psTableBody" class="divide-y divide-slate-100 bg-white">
+                <!-- Dữ liệu JS tự động render -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+
+
+      </div>
+
+      <div class="mt-4 bg-gradient-to-br from-slate-900 to-blue-950 text-white rounded-2xl p-4 text-center shadow-lg">
+        <div class="text-[10px] uppercase tracking-widest text-slate-400 font-semibold">TỔNG THỰC NHẬN</div>
+        <div class="text-2xl font-black mt-1 text-emerald-400"><span id="psThucNhan">0</span>₫</div>
+      </div>
+
+      <p class="text-[10px] text-center text-slate-400 mt-4 italic">Cảm ơn bạn đã đồng hành và cống hiến cho Biolinh 2Hand!</p>
+    </div>
+
+    <div class="bg-slate-50 p-4 border-t border-slate-100 grid grid-cols-3 gap-2">
+      <button type="button" id="btnCopyPayslip" class="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-sm">
+        <i class="bi bi-clipboard"></i> Sao chép
+      </button>
+      <button type="button" id="btnDownloadPayslip" class="px-3 py-2 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-sm">
+        <i class="bi bi-download"></i> Tải ảnh
+      </button>
+      <button type="button" id="btnPrintPayslip" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-sm shadow-blue-500/20">
+        <i class="bi bi-printer"></i> In / PDF
+      </button>
+    </div>
+
+    <button type="button" id="btnClosePayslip" class="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold text-center border-t border-slate-200 transition">
+      ĐÓNG CỬA SỔ
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script>
+// Search Lương
+document.getElementById('searchPayment')?.addEventListener('input', function(e){
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('.paymentTableBody tr').forEach(tr => {
+    const txt = tr.innerText.toLowerCase();
+    tr.style.display = txt.includes(q) ? '' : 'none';
+  });
+});
+
+let currentPayslipData = {};
+
+// Gán sự kiện cho tất cả nút Mở Phiếu Lương
+document.querySelectorAll('.btn-open-payslip').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const d = this.dataset;
+    currentPayslipData = {
+      hovaten: d.hovaten,
+      username: d.username,
+      chucdanh: d.chucdanh,
+      payment_date: d.paymentdate,
+      don_gia: d.dongia,
+      khoi_luong: d.khoiluong,
+      don_vi: d.donvi,
+      thu_nhap: d.thunhap,
+      phat_sinh: d.phatsinh,
+      thuc_nhan: d.thucnhan,
+      chi_tiet_ps: d.chitietps
+    };
+
+    document.getElementById('psHovaten').textContent = d.hovaten;
+    document.getElementById('psUsername').textContent = '@' + d.username;
+    document.getElementById('psChucdanh').textContent = d.chucdanh === 'parttime' ? 'Nhân viên đóng gói' : 'Nhân viên';
+    document.getElementById('psPaymentDate').textContent = d.paymentdate;
+    document.getElementById('psDonGia').textContent = d.dongia;
+    document.getElementById('psKhoiLuong').textContent = d.khoiluong;
+    document.getElementById('psDonVi').textContent = d.donvi;
+    document.getElementById('psThuNhap').textContent = d.thunhap;
+
+    const psElem = document.getElementById('psPhatSinh');
+    const psContainer = document.getElementById('psPhatSinhContainer');
+    psElem.textContent = d.phatsinh;
+
+    if (d.phatsinh.startsWith('+')) {
+      psContainer.className = 'font-bold text-emerald-600';
+    } else if (d.phatsinh.startsWith('-')) {
+      psContainer.className = 'font-bold text-red-600';
+    } else {
+      psContainer.className = 'font-bold text-slate-700';
+    }
+
+    // --- XỬ LÝ RENDER BẢNG CHI TIẾT PHÁT SINH ---
+    const tbody = document.getElementById('psTableBody');
+    const wrapper = document.getElementById('psTableWrapper');
+    tbody.innerHTML = '';
+
+    let listPS = [];
+    try {
+      listPS = JSON.parse(d.chitietps || '[]');
+    } catch (err) {
+      listPS = [];
+    }
+
+    if (listPS && listPS.length > 0) {
+      wrapper.classList.remove('hidden');
+      listPS.forEach(item => {
+        const tr = document.createElement('tr');
+        
+        // Kiểm tra loại phát sinh để xác định tăng (+) hay giảm (-)
+        const loaiNorm = (item.loai || '').toLowerCase().trim();
+        const isTang = loaiNorm === 'tang' || loaiNorm === 'thuong';
+        
+        const colorClass = isTang ? 'text-emerald-600 font-semibold' : 'text-red-600 font-semibold';
+        const sign = isTang ? '+' : '-';
+        
+        // Lấy giá trị tuyệt đối để tránh bị trùng dấu trừ nếu sotien đã mang giá trị âm
+        const absAmount = Math.abs(Number(item.sotien || 0));
+        const formattedAmount = sign + absAmount.toLocaleString('vi-VN') + '₫';
+
+        tr.innerHTML = `
+          <td class="p-1.5 text-slate-500 whitespace-nowrap">${item.date || '-'}</td>
+          <td class="p-1.5 text-slate-800 font-medium">${item.noidung || '-'}</td>
+          <td class="p-1.5 text-right whitespace-nowrap ${colorClass}">${formattedAmount}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } else {
+      wrapper.classList.add('hidden');
+    }
+
+    document.getElementById('psThucNhan').textContent = d.thucnhan;
+    document.getElementById('payslipModal').classList.remove('hidden');
+  });
+});
+
+// Đóng modal
+document.getElementById('btnClosePayslip')?.addEventListener('click', () => {
+  document.getElementById('payslipModal').classList.add('hidden');
+});
+
+// Copy Text
+document.getElementById('btnCopyPayslip')?.addEventListener('click', () => {
+  const d = currentPayslipData;
+  const text = `🧾 ***PHIẾU THANH TOÁN LƯƠNG - BIOLINH 2HAND*** 🧾
+----------------------------------------
+👤 Nhân sự: ${d.hovaten} (@${d.username})
+📅 Ngày quyết toán: ${d.payment_date}
+💼 Loại hình: ${d.chucdanh === 'parttime' ? 'Nhân viên đóng gói' : 'Nhân Viên'}
+----------------------------------------
+• Đơn giá định mức: ${d.don_gia}₫
+• Khối lượng làm: ${d.khoi_luong} ${d.don_vi}
+• Thu nhập ước tính: ${d.thu_nhap}₫
+• Phát sinh (Thưởng/Phạt): ${d.phat_sinh}₫
+----------------------------------------
+💰 **TỔNG THỰC NHẬN: ${d.thuc_nhan}₫**
+----------------------------------------
+Cảm ơn bạn đã cống hiến cho Biolinh 2Hand!`;
+
+  navigator.clipboard.writeText(text).then(() => {
+    alert('Đã sao chép nội dung phiếu lương thành công!');
+  }).catch(() => {
+    alert('Khung bảo mật trình duyệt chặn sao chép tự động.');
+  });
+});
+
+// Tải ảnh PNG
+document.getElementById('btnDownloadPayslip')?.addEventListener('click', () => {
+  const target = document.getElementById('payslipCard');
+  html2canvas(target, { scale: 2 }).then(canvas => {
+    const link = document.createElement('a');
+    link.download = `PhieuLuong_${currentPayslipData.username}_${currentPayslipData.payment_date}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  });
+});
+
+// In / PDF
+document.getElementById('btnPrintPayslip')?.addEventListener('click', () => {
+  const printContents = document.getElementById('payslipCard').innerHTML;
+  const originalContents = document.body.innerHTML;
+
+  document.body.innerHTML = `
+    <div style="display:flex; justify-content:center; align-items:center; min-height:100vh; background:#fff;">
+      <div style="width: 400px; padding: 20px; border: 1px solid #ccc; border-radius: 12px;">
+        ${printContents}
+      </div>
+    </div>
+  `;
+
+  window.print();
+  document.body.innerHTML = originalContents;
+  window.location.reload();
+});
+</script>
+{% endblock %}

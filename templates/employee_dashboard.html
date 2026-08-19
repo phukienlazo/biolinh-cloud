@@ -120,9 +120,9 @@
                                         <td>{{ ps.noidung }}</td>
                                         <td>
                                             {% if ps.loai == 'tang' %}
-                                                <span class="badge bg-success">Tặng (+)</span>
+                                                <span class="badge bg-success">PS tăng</span>
                                             {% else %}
-                                                <span class="badge bg-danger">Giảm (-)</span>
+                                                <span class="badge bg-danger">PS giảm</span>
                                             {% endif %}
                                         </td>
                                         <td class="text-end fw-bold">{{ "{:,.0f}".format(ps.sotien) }} VNĐ</td>

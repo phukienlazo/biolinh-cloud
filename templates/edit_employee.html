@@ -36,12 +36,18 @@
               <label class="text-xs font-semibold text-slate-500 tracking-wide">CHỨC DANH</label>
               <select name="chucdanh" class="mt-1 w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none">
                 <option value="Nhân Viên" {% if emp.chucdanh == 'Nhân Viên' %}selected{% endif %}>Nhân Viên</option>
+                <option value="parttime" {% if emp.chucdanh in ['parttime', 'Part Time'] %}selected{% endif %}>Part Time</option>
                 <option value="QTV" {% if emp.chucdanh == 'QTV' %}selected{% endif %}>Quản Trị Viên (QTV)</option>
               </select>
             </div>
             <div>
               <label class="text-xs font-semibold text-slate-500 tracking-wide">LƯƠNG 1 THÁNG</label>
-              <input type="number" step="any" name="luong" value="{{ emp.luong }}" class="mt-1 w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+              <input type="number" step="any" name="luong" value="{{ emp.luong if emp.luong is not none else '' }}" class="mt-1 w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+              <label class="text-xs font-semibold text-slate-500 tracking-wide">LƯƠNG THEO GIỜ</label>
+              <input type="number" step="any" name="luong_theo_gio" value="{{ emp.luong_theo_gio if emp.luong_theo_gio is not none else '' }}" class="mt-1 w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" placeholder="VNĐ/Giờ">
             </div>
           </div>
           <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl text-sm font-semibold shadow-sm shadow-blue-600/20 transition">LƯU CẬP NHẬT</button>

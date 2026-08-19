@@ -1,0 +1,145 @@
+{% extends "admin_base.html" %}
+{% block title %}Chấm công Part-time {{ emp.hovaten }} - Biolinh{% endblock %}
+{% block breadcrumb_parent %}<a href='/admin' class='hover:text-slate-900'>Quản lý nhân viên</a>{% endblock %}
+{% block breadcrumb_child %}Chấm công Part-time - {{ emp.hovaten }}{% endblock %}
+{% block mobile_title %}Chấm công Part-time{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-[1100px]">
+  <div class="flex items-center gap-3">
+    <a href="{{ url_for('admin_dashboard') }}" class="w-9 h-9 rounded-xl border bg-white flex items-center justify-center hover:bg-slate-50"><i class="bi bi-arrow-left"></i></a>
+    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-bold">{{ emp.hovaten[0] }}</div>
+    <div>
+      <h2 class="text-lg font-bold text-slate-900">Nhật ký chấm công Part-time - {{ emp.hovaten }}</h2>
+      <p class="text-sm text-slate-500">{{ emp.tong_gio }} giờ làm • {{ "{:,.0f}".format(emp.thuc_nhan) }}₫ thực nhận</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-5 gap-6">
+    <!-- Cột trái: Bù công & Thanh toán -->
+    <div class="md:col-span-2 space-y-4">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+        <h5 class="font-bold text-slate-900 flex items-center gap-2 mb-4"><i class="bi bi-plus-circle text-blue-600"></i> Bù công thủ công</h5>
+        <form method="POST" class="space-y-3">
+          <input type="hidden" name="add_attendance" value="1">
+          <div>
+            <label class="text-xs font-semibold text-slate-500 tracking-wide">CHỌN NGÀY</label>
+            <input type="date" name="date" class="mt-1 w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+          </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-500 tracking-wide">CA CHẤM</label>
+            <select name="ca" class="mt-1 w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none">
+              <option value="sang">☀️ Ca Sáng (07:30 - 11:30)</option>
+              <option value="chieu">⛅ Ca Chiều (13:30 - 17:30)</option>
+              <option value="toi">🌙 Ca Tối (18:30 - 22:30)</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs font-semibold text-slate-500 tracking-wide">GIỜ VÀO</label>
+              <input type="time" name="check_in" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+            </div>
+            <div>
+              <label class="text-xs font-semibold text-slate-500 tracking-wide">GIỜ RA</label>
+              <input type="time" name="check_out" class="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" required>
+            </div>
+          </div>
+          <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-semibold">Thêm công thủ công</button>
+        </form>
+      </div>
+
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+        <h5 class="font-bold text-amber-900 flex items-center gap-2"><i class="bi bi-cash-coin"></i> Thanh toán lương kỳ này</h5>
+        <p class="text-xs text-amber-800/80 mt-2 leading-relaxed">Quyết toán sẽ lưu toàn bộ thu nhập vào lịch sử và <b>XÓA HẾT</b> công hiện tại để bắt đầu chu kỳ mới.</p>
+        <div class="mt-4 space-y-2 bg-white rounded-xl p-3 border border-amber-200">
+          <div class="flex justify-between text-sm"><span class="text-slate-500">Số giờ làm:</span><strong>{{ emp.tong_gio }} giờ</strong></div>
+          <div class="flex justify-between text-sm"><span class="text-slate-500">Phát sinh:</span><strong class="{% if emp.tong_phat_sinh>=0 %}text-emerald-600{% else %}text-red-600{% endif %}">{{ "{:,.0f}".format(emp.tong_phat_sinh) }}₫</strong></div>
+          <div class="flex justify-between text-sm pt-2 border-t"><span class="text-slate-500">Thực nhận:</span><strong class="text-red-600 text-[15px]">{{ "{:,.0f}".format(emp.thuc_nhan) }}₫</strong></div>
+        </div>
+        <form action="{{ url_for('pay_salary', emp_id=emp.id) }}" method="POST" onsubmit="return confirm('Xác nhận thanh toán? Toàn bộ giờ làm sẽ RESET về 0!')" class="mt-4">
+          <button type="submit" class="w-full bg-[#0f172a] hover:bg-black text-white py-3 rounded-xl text-sm font-bold tracking-wide">THANH TOÁN & RESET CÔNG</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Cột phải: Nhật ký chấm công chi tiết & Sửa/Xác nhận công -->
+    <div class="md:col-span-3">
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+        <h5 class="font-bold text-slate-900 flex items-center gap-2 mb-4"><i class="bi bi-clock-history"></i> Nhật ký chấm công ({{ logs|length }} lượt)</h5>
+        <div class="space-y-3 max-h-[600px] overflow-auto pr-1">
+          {% if not logs %}
+            <div class="text-center py-12 text-slate-400 border border-slate-200 rounded-xl">
+              <div class="text-2xl mb-2">📅</div>Chưa có lượt chấm công trong kỳ này.
+            </div>
+          {% else %}
+            {% for log in logs %}
+            <div class="p-4 border rounded-xl {% if log.trang_thai == 'da_duyet' %}bg-slate-50/60 border-slate-200{% else %}bg-amber-50/40 border-amber-200{% endif %} transition">
+              <form action="{{ url_for('update_parttime_log', log_id=log.id) }}" method="POST">
+                <input type="hidden" name="emp_id" value="{{ emp.id }}">
+                
+                <div class="flex items-center justify-between mb-3">
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-slate-900">{{ log.date }}</span>
+                    {% if log.ca == 'sang' %}
+                      <span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md text-xs font-semibold">☀️ Sáng - IP: {{ log.ip_address if log.ip_address else 'N/A' }}</span>
+                    {% elif log.ca == 'chieu' %}
+                      <span class="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-md text-xs font-semibold">⛅ Chiều - IP: {{ log.ip_address if log.ip_address else 'N/A' }}</span>
+                    {% else %}
+                      <span class="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-md text-xs font-semibold">🌙 Tối - IP: {{ log.ip_address if log.ip_address else 'N/A' }}</span>
+                    {% endif %}
+                  </div>
+                  
+                  <div>
+                    {% if log.trang_thai == 'da_duyet' %}
+                      <span class="px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold inline-flex items-center gap-1"><i class="bi bi-check-circle-fill"></i> Đã duyệt</span>
+                    {% else %}
+                      <span class="px-2.5 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-bold inline-flex items-center gap-1"><i class="bi bi-hourglass-split"></i> Chờ duyệt</span>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <!-- Chỉnh sửa giờ Ra / Vào -->
+                <div class="grid grid-cols-12 gap-2 items-center">
+                  <div class="col-span-5 md:col-span-4">
+                    <label class="text-[10px] text-slate-400 font-bold block mb-0.5">VÀO CA</label>
+                    <input type="time" name="check_in" value="{{ log.check_in[:5] if log.check_in else '' }}" class="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none">
+                  </div>
+                  
+                  <div class="col-span-5 md:col-span-4">
+                    <label class="text-[10px] text-slate-400 font-bold block mb-0.5">RA CA</label>
+                    <input type="time" name="check_out" value="{{ log.check_out[:5] if log.check_out else '' }}" class="w-full px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500 outline-none">
+                  </div>
+
+                  <div class="col-span-2 md:col-span-4 text-right">
+                    <label class="text-[10px] text-slate-400 font-bold block mb-0.5">TỔNG</label>
+                    <span class="text-xs font-bold text-slate-700">{{ (log.so_phut / 60)|round(1) if log.so_phut else 0 }}h</span>
+                  </div>
+
+                </div>
+
+                <!-- Thanh công cụ hành động -->
+                <div class="mt-3 pt-3 border-t border-slate-200/60 flex items-center justify-end gap-2">
+                  <button type="submit" name="action" value="update" class="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium hover:bg-slate-100 transition text-slate-700">
+                    <i class="bi bi-save"></i> Lưu giờ
+                  </button>
+                  
+                  {% if log.trang_thai != 'da_duyet' %}
+                  <button type="submit" name="action" value="confirm" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">
+                    <i class="bi bi-check-lg"></i> Xác nhận công
+                  </button>
+                  {% endif %}
+
+                  <a href="{{ url_for('delete_parttime_log', log_id=log.id, emp_id=emp.id) }}" class="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-xs transition font-medium" onclick="return confirm('Xóa lượt chấm công này?')">
+                    <i class="bi bi-trash"></i> Xóa
+                  </a>
+                </div>
+              </form>
+            </div>
+            {% endfor %}
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -66,7 +66,7 @@
                   {% for log in logs %}
                   <tr class="hover:bg-slate-50">
                     <td class="px-4 py-3 font-medium text-slate-900">{{ log.date }}</td>
-                    <td class="px-4 py-3">{% if log.session == 'sang' %}<span class="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-xs font-semibold">☀️ Sáng</span>{% else %}<span class="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-xs font-semibold">🌙 Chiều</span>{% endif %}</td>
+                    <td class="px-4 py-3">{% if log.session == 'sang' %}<span class="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-full text-xs font-semibold">☀️ Sáng - IP: {{ log.ip_address if log.ip_address else 'N/A' }}</span>{% else %}<span class="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-xs font-semibold">🌙 Chiều - IP: {{ log.ip_address if log.ip_address else 'N/A' }}</span>{% endif %}</td>
                     <td class="px-4 py-3 text-right"><a href="{{ url_for('delete_attendance', att_id=log.id, emp_id=emp.id) }}" class="px-3 py-1.5 border border-slate-200 rounded-lg text-xs hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition" onclick="return confirm('Xóa lượt chấm công này?')"><i class="bi bi-x-circle"></i> Xóa</a></td>
                   </tr>
                   {% endfor %}
