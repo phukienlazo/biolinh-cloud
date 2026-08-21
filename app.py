@@ -45,7 +45,7 @@ def get_donhang_db_safe():
     return conn
 
 def get_db():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(DATABASE, timeout=10, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -1296,17 +1296,49 @@ def delete_phat_sinh(ps_id, emp_id):
 
 @app.route('/admin/attendance_log/<int:emp_id>', methods=['GET', 'POST'])
 def attendance_log(emp_id):
-    if session.get('role') != 'QTV': return "Từ chối truy cập!", 403
-    conn=get_db(); cur=conn.cursor()
-    if request.method == 'POST' and 'add_attendance' in request.form:
-        date_val=request.form['date']; session_type=request.form['session']
-        try:
-            cur.execute("INSERT INTO attendance (employee_id, date, session) VALUES (?, ?, ?)", (emp_id, date_val, session_type)); conn.commit(); flash('Thêm công mới thành công!', 'success')
-        except sqlite3.IntegrityError:
-            flash('Ca làm việc này vào ngày đã chọn đã được ghi nhận!', 'danger')
-    cur.execute("SELECT * FROM nv WHERE id = ?", (emp_id,)); emp=cur.fetchone()
-    cur.execute("SELECT * FROM attendance WHERE employee_id = ? ORDER BY date DESC, session DESC", (emp_id,)); logs=cur.fetchall()
-    details=calculate_salary_details(emp, conn); conn.close()
+    if session.get('role') != 'QTV': 
+        return "Từ chối truy cập!", 403
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        if request.method == 'POST' and 'add_attendance' in request.form:
+            date_val = request.form.get('date')
+            session_type = request.form.get('session')
+            if not date_val or not session_type:
+                flash('Thiếu ngày hoặc ca!', 'danger')
+            else:
+                try:
+                    cur.execute("INSERT INTO attendance (employee_id, date, session) VALUES (?, ?, ?)", (emp_id, date_val, session_type))
+                    conn.commit()
+                    flash('Thêm công mới thành công!', 'success')
+                except sqlite3.IntegrityError:
+                    flash('Ca này đã được ghi rồi!', 'danger')
+                except Exception as e:
+                    import traceback
+                    print(traceback.format_exc())
+                    flash(f'Lỗi ghi DB: {e}', 'danger')
+
+        cur.execute("SELECT * FROM nv WHERE id = ?", (emp_id,))
+        emp = cur.fetchone()
+        if not emp:
+            flash(f'Nhân viên id={emp_id} không tồn tại trên Render! Hãy sync lại nv.db', 'danger')
+            conn.close()
+            return redirect(url_for('home'))
+
+        cur.execute("SELECT * FROM attendance WHERE employee_id = ? ORDER BY date DESC, session DESC", (emp_id,))
+        logs = cur.fetchall()
+        details = calculate_salary_details(emp, conn)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"[ATTENDANCE_LOG ERROR] {e}")
+        flash(f'Lỗi hệ thống: {e}', 'danger')
+        logs = []
+        details = dict(emp) if emp else {}
+    finally:
+        try: conn.close()
+        except: pass
+
     return render_template('attendance_log.html', emp=details, logs=logs)
 
 @app.route('/admin/delete_attendance/<int:att_id>/<int:emp_id>')
