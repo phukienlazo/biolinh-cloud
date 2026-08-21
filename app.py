@@ -748,11 +748,10 @@ def get_all_doisoat_customers():
             conn.close()
             return []
         cols = [row[1] for row in cur.execute("PRAGMA table_info(doisoat)").fetchall()]
+
+        # FIX: ép lấy revenue = tổng tiền hàng
         rev_col = 'revenue'
-        for cand in ['total_payment','revenue','total_price','amount','tong_tien']:
-            if cand in cols:
-                rev_col = cand
-                break
+
         for r in cur.execute("SELECT * FROM doisoat").fetchall():
             d = dict(r)
             nick = (d.get('nickname') or d.get('nick') or 'Ẩn danh')
@@ -760,7 +759,10 @@ def get_all_doisoat_customers():
                 nick = 'Ẩn danh'
             nick = str(nick).strip()
             username = str(d.get('username') or d.get('user') or '').strip()
-            rev = clean_float(d.get(rev_col) or d.get('revenue') or 0)
+
+            # FIX: chỉ lấy revenue
+            rev = clean_float(d.get(rev_col) or 0)
+
             rd = parse_doisoat_date(d.get('date'))
             if nick not in customers_map:
                 customers_map[nick] = {'nickname': nick, 'username': username, 'total_payment': 0.0, 'order_count': 0, 'last_date_str': '', 'last_date_obj': None}
@@ -1869,8 +1871,7 @@ def sync_db(ten_db):
     tmp=ten_db+".tmp"
     request.files['file'].save(tmp)
     os.replace(tmp, ten_db)
-    if ten_db=="nv.db":
-        return f"OK {ten_db}"
+    return f"OK {ten_db}"
 
 # ---- THÊM MỚI 2 API NÀY ĐỂ GUI HOẠT ĐỘNG ----
 def _calc_md5(file_path):

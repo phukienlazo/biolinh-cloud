@@ -1,0 +1,6 @@
+31/7/2026:
+thêm sync 2 chiều và code quản lý đơn hàng, ký gửi, đối soát....
+19/08/2026:
+thêm chấm công cho part-time và báo cáo trả lương, phiếu lương
+21/08/2026:
+sửa lỗi sync báo 500 ở client, sửa báo cáo phần khách hàng đã thanh toán từ total_payment -> revenue (total_price)
