@@ -10,3 +10,4 @@ gevent
 gevent-websocket
 reportlab
 gunicorn
+tzdata

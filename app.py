@@ -1486,11 +1486,13 @@ def employee_checkin():
 # ==========================================
 
 from datetime import datetime, time
+from zoneinfo import ZoneInfo
+VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
 
-# Route Dashboard dành cho Part Time
+# Route Dashboard dành cho Part Time - fix Render
 @app.route('/part-time')
 def part_time_dashboard():
-    if 'user_id' not in session: 
+    if 'user_id' not in session:
         return redirect(url_for('login'))
     if session.get('role') not in ['parttime', 'Part Time']:
         flash('Bạn không có quyền truy cập trang này!', 'danger')
@@ -1499,139 +1501,118 @@ def part_time_dashboard():
     emp_id = session['user_id']
     conn = get_db()
     cur = conn.cursor()
+    try:
+        cur.execute("SELECT * FROM nv WHERE id =?", (emp_id,))
+        emp = cur.fetchone()
+        if not emp:
+            flash('Nhân viên không tồn tại', 'danger')
+            return redirect(url_for('login'))
 
-    # Lấy thông tin nhân viên
-    cur.execute("SELECT * FROM nv WHERE id = ?", (emp_id,))
-    emp = cur.fetchone()
+        cur.execute("SELECT * FROM cham_cong_part_time WHERE employee_id=? AND trang_thai='da_duyet' ORDER BY date DESC", (emp_id,))
+        approved_records = cur.fetchall()
+        tong_phut = sum((r['so_phut'] or 0) for r in approved_records)
+        tong_gio = round(tong_phut/60.0, 2)
+        luong_theo_gio = emp['luong_theo_gio'] or 0
 
-    # Lấy danh sách chấm công đã duyệt để tính tổng giờ & lương
-    cur.execute("""
-        SELECT * FROM cham_cong_part_time 
-        WHERE employee_id = ? AND trang_thai = 'da_duyet'
-        ORDER BY date DESC, id DESC
-    """, (emp_id,))
-    approved_records = cur.fetchall()
+        cur.execute("SELECT * FROM chi_tiet_phat_sinh WHERE employee_id=? ORDER BY date DESC", (emp_id,))
+        phat_sinh = cur.fetchall()
+        tong_ps = sum(ps['sotien'] if ps['loai']=='tang' else -ps['sotien'] for ps in phat_sinh)
 
-    tong_phut_da_duyet = sum(r['so_phut'] or 0 for r in approved_records)
-    tong_gio = round(tong_phut_da_duyet / 60.0, 2)
-    luong_theo_gio = emp['luong_theo_gio'] or 0
-    uoc_tinh_luong = tong_gio * luong_theo_gio
+        cur.execute("SELECT * FROM cham_cong_part_time WHERE employee_id=? ORDER BY date DESC, id DESC", (emp_id,))
+        history = cur.fetchall()
 
-    # Lấy phát sinh (nếu có)
-    cur.execute("SELECT * FROM chi_tiet_phat_sinh WHERE employee_id = ? ORDER BY date DESC", (emp_id,))
-    phat_sinh = cur.fetchall()
-    tong_phat_sinh = sum(ps['sotien'] if ps['loai'] == 'tang' else -ps['sotien'] for ps in phat_sinh)
+        # QUAN TRỌNG: dùng giờ VN
+        today_str = datetime.now(VN_TZ).strftime('%Y-%m-%d')
+        cur.execute("SELECT * FROM cham_cong_part_time WHERE employee_id=? AND date=?", (emp_id, today_str))
+        today_records = {r['ca']: dict(r) for r in cur.fetchall()}
 
-    thuc_nhan = uoc_tinh_luong + tong_phat_sinh
+        emp_data = {
+            'hovaten': emp['hovaten'],
+            'chucdanh': emp['chucdanh'],
+            'luong_theo_gio': luong_theo_gio,
+            'tong_gio': tong_gio,
+            'uoc_tinh_luong': tong_gio * luong_theo_gio,
+            'tong_phat_sinh': tong_ps,
+            'thuc_nhan': tong_gio * luong_theo_gio + tong_ps
+        }
+        return render_template('part_time.html', emp=emp_data, phat_sinh=phat_sinh, history=history, today=today_records)
+    finally:
+        try: conn.close()
+        except: pass
 
-    # Lấy tất cả lịch sử chấm công
-    cur.execute("""
-        SELECT * FROM cham_cong_part_time 
-        WHERE employee_id = ? 
-        ORDER BY date DESC, id DESC
-    """, (emp_id,))
-    history = cur.fetchall()
-
-    # Kiểm tra ca làm hiện tại hôm nay
-    today_str = datetime.now().strftime('%Y-%m-%d')
-    cur.execute("SELECT * FROM cham_cong_part_time WHERE employee_id = ? AND date = ?", (emp_id, today_str))
-    today_records = {r['ca']: r for r in cur.fetchall()}
-
-    conn.close()
-
-    emp_data = {
-        'hovaten': emp['hovaten'],
-        'chucdanh': emp['chucdanh'],
-        'luong_theo_gio': luong_theo_gio,
-        'tong_gio': tong_gio,
-        'uoc_tinh_luong': uoc_tinh_luong,
-        'tong_phat_sinh': tong_phat_sinh,
-        'thuc_nhan': thuc_nhan
-    }
-
-    return render_template('part_time.html', emp=emp_data, phat_sinh=phat_sinh, history=history, today=today_records)
-
-
-# API Xử lý Chấm công (Vào ca / Ra ca)
+# API Xử lý Chấm công - bản fix Render
 @app.route('/part-time/checkin', methods=['POST'])
 def parttime_checkin():
     if 'user_id' not in session or session.get('role') not in ['parttime', 'Part Time']:
         flash('Bạn không có quyền thực hiện thao tác này!', 'danger')
         return redirect(url_for('login'))
 
-    ca = request.form.get('ca')          # 'sang', 'chieu', 'toi'
-    action = request.form.get('action')  # 'check_in', 'check_out'
-    now = datetime.now()
+    ca = request.form.get('ca')
+    action = request.form.get('action')
+
+    # DÙNG GIỜ VN, không dùng giờ UTC của Render
+    now = datetime.now(VN_TZ)
     current_time = now.time()
     today_str = now.strftime('%Y-%m-%d')
     time_str = now.strftime('%H:%M:%S')
 
-    # Kiếm tra khung giờ hợp lệ cho từng ca
-    # Ca Sáng (7:30 - 11:30) -> Cho phép bấm từ 07:00 đến 12:00
-    # Ca Chiều (13:30 - 17:30) -> Cho phép bấm từ 13:00 đến 18:30
-    # Ca Tối -> Cho phép bấm từ 18:30 đến 23:59
     time_ranges = {
         'sang': (time(7, 0), time(12, 0)),
         'chieu': (time(13, 0), time(18, 30)),
         'toi': (time(18, 30), time(23, 59, 59))
     }
-
     if ca not in time_ranges:
         flash('Ca làm việc không hợp lệ!', 'danger')
         return redirect(url_for('part_time_dashboard'))
 
     start_valid, end_valid = time_ranges[ca]
     if not (start_valid <= current_time <= end_valid):
-        flash('Không thể chấm công ngoài ca làm việc!', 'danger')
+        flash(f'Không thể chấm công ngoài ca làm việc! Hiện tại {current_time.strftime("%H:%M")} VN, ca {ca} cho phép {start_valid.strftime("%H:%M")}-{end_valid.strftime("%H:%M")}', 'danger')
         return redirect(url_for('part_time_dashboard'))
 
     emp_id = session['user_id']
     conn = get_db()
     cur = conn.cursor()
+    try:
+        cur.execute("SELECT * FROM cham_cong_part_time WHERE employee_id=? AND date=? AND ca=?", (emp_id, today_str, ca))
+        record = cur.fetchone()
 
-    cur.execute("SELECT * FROM cham_cong_part_time WHERE employee_id = ? AND date = ? AND ca = ?", (emp_id, today_str, ca))
-    record = cur.fetchone()
-
-    if action == 'check_in':
-        if record and record['check_in']:
-            flash(f'Bạn đã bắt đầu ca {ca} hôm nay rồi!', 'warning')
-        else:
-            if not record:
-                # GỌI HÀM DÙNG CHUNG Ở ĐÂY
-                save_attendance_log('cham_cong_part_time', emp_id, today_str, ca, check_in_time=time_str)
+        if action == 'check_in':
+            if record and record['check_in']:
+                flash(f'Bạn đã bắt đầu ca {ca} hôm nay rồi!', 'warning')
             else:
-                # Nếu đã có record thì chỉ update check_in và IP
-                ip_addr = get_client_ip()
-                conn = get_db()
-                cur = conn.cursor()
-                cur.execute("UPDATE cham_cong_part_time SET check_in = ?, ip_address = ? WHERE id = ?", (time_str, ip_addr, record['id']))
+                if not record:
+                    save_attendance_log('cham_cong_part_time', emp_id, today_str, ca, check_in_time=time_str)
+                else:
+                    ip_addr = get_client_ip()
+                    cur.execute("UPDATE cham_cong_part_time SET check_in=?, ip_address=? WHERE id=?", (time_str, ip_addr, record['id']))
+                    conn.commit()
+                flash(f'Bắt đầu ca {ca.upper()} lúc {time_str} thành công!', 'success')
+
+        elif action == 'check_out':
+            if not record or not record['check_in']:
+                flash('Bạn chưa bấm Bắt đầu ca này!', 'warning')
+            elif record['check_out']:
+                flash('Bạn đã bấm Kết thúc ca này rồi!', 'warning')
+            else:
+                # tính phút, chấp nhận cả HH:MM:SS
+                try:
+                    t_in = datetime.strptime(record['check_in'][:8], '%H:%M:%S')
+                    t_out = datetime.strptime(time_str, '%H:%M:%S')
+                    so_phut = int((t_out - t_in).total_seconds() // 60)
+                    if so_phut < 0: so_phut = 0
+                except:
+                    so_phut = 0
+                cur.execute("UPDATE cham_cong_part_time SET check_out=?, so_phut=? WHERE id=?", (time_str, so_phut, record['id']))
                 conn.commit()
-                conn.close()
-            
-            flash(f'Bắt đầu ca {ca.upper()} lúc {time_str} thành công!', 'success')
+                flash(f'Kết thúc ca {ca.upper()} lúc {time_str}. Tổng {so_phut} phút.', 'success')
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        flash(f'Lỗi chấm công: {e}', 'danger')
+    finally:
+        try: conn.close()
+        except: pass
 
-    elif action == 'check_out':
-        if not record or not record['check_in']:
-            flash('Bạn chưa bấm Bắt đầu ca này!', 'warning')
-        elif record['check_out']:
-            flash('Bạn đã bấm Kết thúc ca này rồi!', 'warning')
-        else:
-            # Tính số phút làm việc
-            t_in = datetime.strptime(record['check_in'], '%H:%M:%S')
-            t_out = datetime.strptime(time_str, '%H:%M:%S')
-            so_phut = int((t_out - t_in).total_seconds() // 60)
-            if so_phut < 0:
-                so_phut = 0
-
-            cur.execute("""
-                UPDATE cham_cong_part_time 
-                SET check_out = ?, so_phut = ? 
-                WHERE id = ?
-            """, (time_str, so_phut, record['id']))
-            conn.commit()
-            flash(f'Kết thúc ca {ca.upper()} lúc {time_str}. Tổng làm {so_phut} phút.', 'success')
-
-    conn.close()
     return redirect(url_for('part_time_dashboard'))
 
 # ==========================================
