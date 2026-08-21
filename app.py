@@ -1638,151 +1638,128 @@ def parttime_checkin():
 # PHẦN CODE QUẢN LÝ NHÂN VIÊN PART-TIME
 # ==========================================
 
-# 1. Trang Chỉnh Sửa Nhân Viên Part-Time (edit_parttime)
+# 1. Edit part-time - bản fix Render
 @app.route('/admin/parttime/edit/<int:emp_id>', methods=['GET', 'POST'])
 def edit_parttime(emp_id):
     if 'user_id' not in session or session.get('role') not in ['QTV', 'Admin']:
         flash('Bạn không có quyền truy cập trang này!', 'danger')
         return redirect(url_for('login'))
-
     conn = get_db()
     cur = conn.cursor()
+    try:
+        if request.method == 'POST':
+            hovaten = request.form.get('hovaten','').strip()
+            chucdanh = request.form.get('chucdanh','').strip()
+            luong_raw = request.form.get('luong_theo_gio','0').replace(',','').strip()
+            try:
+                luong_theo_gio = float(luong_raw) if luong_raw else 0
+            except:
+                luong_theo_gio = 0
+            password = request.form.get('password','').strip()
+            if password:
+                cur.execute("UPDATE nv SET hovaten=?, chucdanh=?, luong_theo_gio=?, password=? WHERE id=?",
+                            (hovaten, chucdanh, luong_theo_gio, password, emp_id))
+            else:
+                cur.execute("UPDATE nv SET hovaten=?, chucdanh=?, luong_theo_gio=? WHERE id=?",
+                            (hovaten, chucdanh, luong_theo_gio, emp_id))
+            conn.commit()
+            flash('Cập nhật Part-time thành công!', 'success')
+            return redirect(url_for('edit_parttime', emp_id=emp_id))
 
-    if request.method == 'POST':
-        hovaten = request.form.get('hovaten')
-        chucdanh = request.form.get('chucdanh')
-        luong_theo_gio = request.form.get('luong_theo_gio')
-        password = request.form.get('password')
+        cur.execute("SELECT * FROM nv WHERE id = ?", (emp_id,))
+        emp = cur.fetchone()
+        if not emp:
+            flash(f'Nhân viên {emp_id} không có trên Render', 'danger')
+            return redirect(url_for('home'))
 
-        if password and password.strip():
-            cur.execute("""
-                UPDATE nv 
-                SET hovaten = ?, chucdanh = ?, luong_theo_gio = ?, password = ? 
-                WHERE id = ?
-            """, (hovaten, chucdanh, float(luong_theo_gio) if luong_theo_gio else 0, password.strip(), emp_id))
-        else:
-            cur.execute("""
-                UPDATE nv 
-                SET hovaten = ?, chucdanh = ?, luong_theo_gio = ? 
-                WHERE id = ?
-            """, (hovaten, chucdanh, float(luong_theo_gio) if luong_theo_gio else 0, emp_id))
+        cur.execute("SELECT * FROM cham_cong_part_time WHERE employee_id=? AND trang_thai='da_duyet'", (emp_id,))
+        approved = cur.fetchall()
+        tong_phut = sum((r['so_phut'] or 0) for r in approved)
+        tong_gio = round(tong_phut/60.0, 2)
+        uoc_tinh = tong_gio * (emp['luong_theo_gio'] or 0)
 
-        conn.commit()
-        flash('Cập nhật thông tin nhân viên Part-time thành công!', 'success')
-        return redirect(url_for('edit_parttime', emp_id=emp_id))
+        cur.execute("SELECT * FROM chi_tiet_phat_sinh WHERE employee_id=? ORDER BY date DESC", (emp_id,))
+        phat_sinh = cur.fetchall()
+        tong_ps = sum(ps['sotien'] if ps['loai']=='tang' else -ps['sotien'] for ps in phat_sinh)
 
-    # Lấy thông tin nhân viên
-    cur.execute("SELECT * FROM nv WHERE id = ?", (emp_id,))
-    emp = cur.fetchone()
+        emp_data = dict(emp)
+        emp_data.update({'tong_gio': tong_gio, 'thu_nhap_uoc_tinh': uoc_tinh, 'tong_phat_sinh': tong_ps, 'thuc_nhan': uoc_tinh+tong_ps})
+        return render_template('edit_parttime.html', emp=emp_data, phat_sinh=phat_sinh)
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        flash(f'Lỗi: {e}', 'danger')
+        return redirect(url_for('home'))
+    finally:
+        try: conn.close()
+        except: pass
 
-    # Tính toán tổng giờ làm đã duyệt
-    cur.execute("""
-        SELECT * FROM cham_cong_part_time 
-        WHERE employee_id = ? AND trang_thai = 'da_duyet'
-    """, (emp_id,))
-    approved_records = cur.fetchall()
-
-    tong_phut = sum(r['so_phut'] or 0 for r in approved_records)
-    tong_gio = round(tong_phut / 60.0, 2)
-    luong_theo_gio = emp['luong_theo_gio'] or 0
-    uoc_tinh_luong = tong_gio * luong_theo_gio
-
-    # Lấy danh sách phát sinh
-    cur.execute("SELECT * FROM chi_tiet_phat_sinh WHERE employee_id = ? ORDER BY date DESC", (emp_id,))
-    phat_sinh = cur.fetchall()
-    tong_phat_sinh = sum(ps['sotien'] if ps['loai'] == 'tang' else -ps['sotien'] for ps in phat_sinh)
-
-    thuc_nhan = uoc_tinh_luong + tong_phat_sinh
-
-    emp_data = dict(emp)
-    emp_data['tong_gio'] = tong_gio
-    emp_data['thu_nhap_uoc_tinh'] = uoc_tinh_luong
-    emp_data['tong_phat_sinh'] = tong_phat_sinh
-    emp_data['thuc_nhan'] = thuc_nhan
-
-    conn.close()
-    return render_template('edit_parttime.html', emp=emp_data, phat_sinh=phat_sinh)
-
-
-# 2. Trang Nhật Ký Chấm Công Part-Time (parttime_attendance_log)
+# 2. Nhật ký chấm công part-time - fix datetime + None
 @app.route('/admin/parttime/attendance/<int:emp_id>', methods=['GET', 'POST'])
 def parttime_attendance_log(emp_id):
     if 'user_id' not in session or session.get('role') not in ['QTV', 'Admin']:
-        flash('Bạn không có quyền truy cập trang này!', 'danger')
+        flash('Bạn không có quyền!', 'danger')
         return redirect(url_for('login'))
-
     conn = get_db()
     cur = conn.cursor()
+    try:
+        if request.method == 'POST' and request.form.get('add_attendance'):
+            date_str = request.form.get('date')
+            ca = request.form.get('ca')
+            check_in = request.form.get('check_in','').strip()
+            check_out = request.form.get('check_out','').strip()
+            so_phut = 0
+            # chấp nhận cả HH:MM và HH:MM:SS
+            def parse_hhmm(s):
+                if not s: return None
+                s = s.strip()[:5]
+                return datetime.strptime(s, '%H:%M')
+            if check_in and check_out:
+                try:
+                    t_in = parse_hhmm(check_in)
+                    t_out = parse_hhmm(check_out)
+                    so_phut = int((t_out - t_in).total_seconds()//60)
+                    if so_phut < 0: so_phut = 0
+                except Exception as e:
+                    print(f"parse time error {e}")
+                    so_phut = 0
+                if len(check_in)==5: check_in+=":00"
+                if len(check_out)==5: check_out+=":00"
+            cur.execute("INSERT INTO cham_cong_part_time (employee_id, date, ca, check_in, check_out, so_phut, trang_thai) VALUES (?,?,?,?,?,?, 'da_duyet')",
+                        (emp_id, date_str, ca, check_in, check_out, so_phut))
+            conn.commit()
+            flash('Thêm công thủ công thành công!', 'success')
+            return redirect(url_for('parttime_attendance_log', emp_id=emp_id))
 
-    # Xử lý Bù công thủ công
-    if request.method == 'POST' and request.form.get('add_attendance'):
-        date_str = request.form.get('date')
-        ca = request.form.get('ca')
-        check_in = request.form.get('check_in')
-        check_out = request.form.get('check_out')
+        cur.execute("SELECT * FROM nv WHERE id=?", (emp_id,))
+        emp = cur.fetchone()
+        if not emp:
+            flash('Nhân viên không tồn tại trên Render', 'danger')
+            return redirect(url_for('home'))
 
-        # Tính số phút dựa trên check_in và check_out
-        so_phut = 0
-        if check_in and check_out:
-            t_in = datetime.strptime(check_in, '%H:%M')
-            t_out = datetime.strptime(check_out, '%H:%M')
-            so_phut = int((t_out - t_in).total_seconds() // 60)
-            if so_phut < 0:
-                so_phut = 0
+        cur.execute("SELECT * FROM cham_cong_part_time WHERE employee_id=? ORDER BY date DESC, id DESC", (emp_id,))
+        logs = cur.fetchall()
+        cur.execute("SELECT * FROM cham_cong_part_time WHERE employee_id=? AND trang_thai='da_duyet'", (emp_id,))
+        approved = cur.fetchall()
+        tong_phut = sum((r['so_phut'] or 0) for r in approved)
+        tong_gio = round(tong_phut/60.0, 2)
+        uoc_tinh = tong_gio * (emp['luong_theo_gio'] or 0)
+        cur.execute("SELECT * FROM chi_tiet_phat_sinh WHERE employee_id=?", (emp_id,))
+        ps = cur.fetchall()
+        tong_ps = sum(p['sotien'] if p['loai']=='tang' else -p['sotien'] for p in ps)
 
-            # Định dạng chuẩn HH:MM:SS
-            check_in += ":00"
-            check_out += ":00"
-
-        cur.execute("""
-            INSERT INTO cham_cong_part_time (employee_id, date, ca, check_in, check_out, so_phut, trang_thai)
-            VALUES (?, ?, ?, ?, ?, ?, 'da_duyet')
-        """, (emp_id, date_str, ca, check_in, check_out, so_phut))
-        conn.commit()
-        flash('Thêm công thủ công thành công!', 'success')
-        return redirect(url_for('parttime_attendance_log', emp_id=emp_id))
-
-    # Lấy thông tin nhân viên
-    cur.execute("SELECT * FROM nv WHERE id = ?", (emp_id,))
-    emp = cur.fetchone()
-
-    # Lấy danh sách lượt chấm công
-    cur.execute("""
-        SELECT * FROM cham_cong_part_time 
-        WHERE employee_id = ? 
-        ORDER BY date DESC, id DESC
-    """, (emp_id,))
-    logs = cur.fetchall()
-
-    # Tính toán tổng giờ làm đã duyệt
-    cur.execute("""
-        SELECT * FROM cham_cong_part_time 
-        WHERE employee_id = ? AND trang_thai = 'da_duyet'
-    """, (emp_id,))
-    approved_records = cur.fetchall()
-
-    tong_phut = sum(r['so_phut'] or 0 for r in approved_records)
-    tong_gio = round(tong_phut / 60.0, 2)
-    luong_theo_gio = emp['luong_theo_gio'] or 0
-    uoc_tinh_luong = tong_gio * luong_theo_gio
-
-    # Lấy tổng phát sinh
-    cur.execute("SELECT * FROM chi_tiet_phat_sinh WHERE employee_id = ?", (emp_id,))
-    phat_sinh = cur.fetchall()
-    tong_phat_sinh = sum(ps['sotien'] if ps['loai'] == 'tang' else -ps['sotien'] for ps in phat_sinh)
-
-    thuc_nhan = uoc_tinh_luong + tong_phat_sinh
-
-    emp_data = dict(emp)
-    emp_data['tong_gio'] = tong_gio
-    emp_data['tong_phat_sinh'] = tong_phat_sinh
-    emp_data['thuc_nhan'] = thuc_nhan
-
-    conn.close()
-    return render_template('parttime_attendance_log.html', emp=emp_data, logs=logs)
+        emp_data = dict(emp)
+        emp_data.update({'tong_gio': tong_gio, 'tong_phat_sinh': tong_ps, 'thuc_nhan': uoc_tinh+tong_ps})
+        return render_template('parttime_attendance_log.html', emp=emp_data, logs=logs)
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        flash(f'Lỗi: {e}', 'danger')
+        return redirect(url_for('home'))
+    finally:
+        try: conn.close()
+        except: pass
 
 
-# API Cập nhật giờ làm & Xác nhận công Part-Time
+# API Cập nhật giờ làm & Xác nhận công Part-Time - bản fix Render
 @app.route('/admin/parttime/update-log/<int:log_id>', methods=['POST'])
 def update_parttime_log(log_id):
     if 'user_id' not in session or session.get('role') not in ['QTV', 'Admin']:
@@ -1790,48 +1767,59 @@ def update_parttime_log(log_id):
         return redirect(url_for('login'))
 
     emp_id = request.form.get('emp_id')
-    check_in = request.form.get('check_in')
-    check_out = request.form.get('check_out')
-    action = request.form.get('action') # 'update' hoặc 'confirm'
+    check_in = (request.form.get('check_in') or '').strip()
+    check_out = (request.form.get('check_out') or '').strip()
+    action = request.form.get('action')
 
     conn = get_db()
     cur = conn.cursor()
+    try:
+        so_phut = 0
+        if check_in and check_out:
+            try:
+                # chấp nhận cả HH:MM và HH:MM:SS
+                c_in_str = check_in[:5]
+                c_out_str = check_out[:5]
+                t_in = datetime.strptime(c_in_str, '%H:%M')
+                t_out = datetime.strptime(c_out_str, '%H:%M')
+                so_phut = int((t_out - t_in).total_seconds() // 60)
+                if so_phut < 0:
+                    so_phut = 0
+            except Exception as e:
+                print(f"[parse time error] {e}")
+                so_phut = 0
 
-    so_phut = 0
-    if check_in and check_out:
-        # Chuẩn hóa về format HH:MM
-        c_in_str = check_in[:5]
-        c_out_str = check_out[:5]
-        t_in = datetime.strptime(c_in_str, '%H:%M')
-        t_out = datetime.strptime(c_out_str, '%H:%M')
-        so_phut = int((t_out - t_in).total_seconds() // 60)
-        if so_phut < 0:
-            so_phut = 0
+            if len(check_in) == 5: check_in += ":00"
+            if len(check_out) == 5: check_out += ":00"
 
-        if len(check_in) == 5: check_in += ":00"
-        if len(check_out) == 5: check_out += ":00"
+        if action == 'confirm':
+            cur.execute("""
+                UPDATE cham_cong_part_time 
+                SET check_in=?, check_out=?, so_phut=?, trang_thai='da_duyet' 
+                WHERE id=?
+            """, (check_in, check_out, so_phut, log_id))
+            flash('Đã duyệt và xác nhận công!', 'success')
+        else:
+            cur.execute("""
+                UPDATE cham_cong_part_time 
+                SET check_in=?, check_out=?, so_phut=? 
+                WHERE id=?
+            """, (check_in, check_out, so_phut, log_id))
+            flash('Đã cập nhật giờ ra vào!', 'success')
+        conn.commit()
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        flash(f'Lỗi cập nhật: {e}', 'danger')
+    finally:
+        try: conn.close()
+        except: pass
 
-    if action == 'confirm':
-        cur.execute("""
-            UPDATE cham_cong_part_time 
-            SET check_in = ?, check_out = ?, so_phut = ?, trang_thai = 'da_duyet' 
-            WHERE id = ?
-        """, (check_in, check_out, so_phut, log_id))
-        flash('Đã duyệt và xác nhận công!', 'success')
-    else:
-        cur.execute("""
-            UPDATE cham_cong_part_time 
-            SET check_in = ?, check_out = ?, so_phut = ? 
-            WHERE id = ?
-        """, (check_in, check_out, so_phut, log_id))
-        flash('Đã cập nhật giờ ra vào!', 'success')
-
-    conn.commit()
-    conn.close()
+    # emp_id có thể None nếu form lỗi
+    if not emp_id:
+        return redirect(url_for('home'))
     return redirect(url_for('parttime_attendance_log', emp_id=emp_id))
 
-
-# API Xóa lượt chấm công Part-Time
+# API Xóa lượt chấm công Part-Time - bản fix Render
 @app.route('/admin/parttime/delete-log/<int:log_id>/<int:emp_id>')
 def delete_parttime_log(log_id, emp_id):
     if 'user_id' not in session or session.get('role') not in ['QTV', 'Admin']:
@@ -1840,11 +1828,17 @@ def delete_parttime_log(log_id, emp_id):
 
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("DELETE FROM cham_cong_part_time WHERE id = ?", (log_id,))
-    conn.commit()
-    conn.close()
-    
-    flash('Đã xóa lượt chấm công thành công!', 'success')
+    try:
+        cur.execute("DELETE FROM cham_cong_part_time WHERE id=?", (log_id,))
+        conn.commit()
+        flash('Đã xóa lượt chấm công thành công!', 'success')
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        flash(f'Lỗi xóa: {e}', 'danger')
+    finally:
+        try: conn.close()
+        except: pass
+
     return redirect(url_for('parttime_attendance_log', emp_id=emp_id))
 
 # ==============================================================================
