@@ -45,11 +45,26 @@ def get_donhang_db_safe():
     return conn
 
 def get_db():
-    conn = sqlite3.connect(DATABASE, timeout=10, check_same_thread=False)
+    conn = sqlite3.connect(DATABASE, timeout=30, check_same_thread=False, isolation_level=None)
     conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA busy_timeout=30000;")
+    except:
+        pass
     return conn
 
-
+def db_execute_with_retry(cur, sql, params=(), retries=5):
+    for i in range(retries):
+        try:
+            cur.execute(sql, params)
+            return True
+        except sqlite3.OperationalError as e:
+            if "locked" in str(e).lower() and i < retries-1:
+                time.sleep(0.2 * (i+1))
+                continue
+            raise
 
 def ensure_khachhang_tables():
     try:
@@ -1835,30 +1850,29 @@ def get_client_ip():
     return request.remote_addr
 
 def save_attendance_log(table_name, emp_id, date_str, session_or_ca, check_in_time=None, trang_thai='cho_duyet'):
-    """
-    Hàm ghi nhận lượt chấm công kèm IP tự động
-    - table_name: 'attendance' (Chính thức) hoặc 'cham_cong_part_time' (Part-time)
-    """
     ip_addr = get_client_ip()
     conn = get_db()
     cur = conn.cursor()
-
-    if table_name == 'attendance':
-        # Dành cho NV Chính Thức (chấm công theo ca/buổi)
-        cur.execute("""
-            INSERT INTO attendance (employee_id, date, session, ip_address) 
-            VALUES (?, ?, ?, ?)
-        """, (emp_id, date_str, session_or_ca, ip_addr))
-        
-    elif table_name == 'cham_cong_part_time':
-        # Dành cho NV Part-time (chấm công theo giờ Check-in)
-        cur.execute("""
-            INSERT INTO cham_cong_part_time (employee_id, date, ca, check_in, trang_thai, ip_address)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (emp_id, date_str, session_or_ca, check_in_time, trang_thai, ip_addr))
-
-    conn.commit()
-    conn.close()
+    try:
+        if table_name == 'attendance':
+            db_execute_with_retry(cur, """
+                INSERT INTO attendance (employee_id, date, session, ip_address) 
+                VALUES (?, ?, ?, ?)
+            """, (emp_id, date_str, session_or_ca, ip_addr))
+        elif table_name == 'cham_cong_part_time':
+            db_execute_with_retry(cur, """
+                INSERT INTO cham_cong_part_time (employee_id, date, ca, check_in, trang_thai, ip_address)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (emp_id, date_str, session_or_ca, check_in_time, trang_thai, ip_addr))
+        conn.commit()
+    except sqlite3.IntegrityError:
+        raise  # để route ngoài bắt "đã chấm rồi"
+    except Exception as e:
+        print(f"[DB LOCK] {e}")
+        raise
+    finally:
+        try: conn.close()
+        except: pass
 
 
 
