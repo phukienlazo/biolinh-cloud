@@ -190,17 +190,53 @@
       <h1 class="md:hidden font-semibold text-slate-900 text-[15px]">{% block mobile_title %}Dashboard{% endblock %}</h1>
     </div>
     <div class="flex items-center gap-3">
-      <div class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-[11.5px] text-emerald-700 font-medium">
-        <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Cloud: Đã đồng bộ
-      </div>
-      <div class="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center relative hover:bg-slate-50 cursor-pointer transition">
-        <i class="bi bi-bell text-[16px] text-slate-600"></i><span class="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"></span>
-      </div>
-      <div class="hidden md:block text-right leading-tight">
-        <div class="text-[13px] font-medium text-slate-900" id="clock">--:-- - --/--/----</div>
-        <div class="text-[10px] text-slate-500">Asia/Ho_Chi_Minh</div>
+  <div class="hidden md:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-[11.5px] text-emerald-700 font-medium">
+    <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Cloud: Đã đồng bộ
+  </div>
+
+    <!-- Nút Chuông Thông Báo -->
+    <div class="relative">
+      <button 
+        class="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center relative hover:bg-slate-50 cursor-pointer transition focus:outline-none" 
+        type="button" 
+        id="bellNotificationBtn"
+        onclick="toggleNotificationMenu(event)"
+      >
+        <i class="bi bi-bell text-[16px] text-slate-600"></i>
+        
+        <!-- Badge thông báo -->
+        <span 
+          id="unreadBadge" 
+          class="hidden absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-500 text-white text-[10px] font-bold rounded-full border-2 border-white flex items-center justify-center z-10"
+        >
+          0
+        </span>
+      </button>
+
+      <!-- Menu Thả Xuống (Mặc định thêm class 'hidden' để ẩn đi) -->
+      <div 
+        id="notificationDropdown"
+        class="hidden absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto overflow-x-hidden bg-white shadow-xl border border-slate-200 rounded-2xl p-0 text-slate-700 z-50" 
+      >
+        <div class="bg-slate-50 px-4 py-3 border-b border-slate-100 flex items-center justify-between sticky top-0 z-10">
+          <span class="font-semibold text-xs text-slate-800 uppercase tracking-wider">DS duyệt chấm công</span>
+          <span class="text-[11px] text-slate-400">Mới nhất</span>
+        </div>
+        
+        <!-- Danh sách thông báo -->
+        <ul id="notificationList" class="divide-y divide-slate-100 m-0 p-0">
+          <li class="p-4 text-center text-xs text-slate-400 list-none">
+            Đang tải thông báo...
+          </li>
+        </ul>
       </div>
     </div>
+
+    <div class="hidden md:block text-right leading-tight">
+      <div class="text-[13px] font-medium text-slate-900" id="clock">--:-- - --/--/----</div>
+      <div class="text-[10px] text-slate-500">Asia/Ho_Chi_Minh</div>
+    </div>
+  </div>
   </header>
 
   <main class="flex-1 overflow-auto p-4 md:p-6">
@@ -248,6 +284,81 @@ function updateClock(){
 }
 setInterval(updateClock,1000);updateClock();
 </script>
+<!-- Javascript tự động tải thông báo và cập nhật giao diện -->
+
+<script>
+
+document.addEventListener("DOMContentLoaded", function () {
+    fetchUnconfirmedAttendance();
+    
+    // Tự động kiểm tra thông báo mới mỗi 30 giây (tùy chọn)
+    setInterval(fetchUnconfirmedAttendance, 30000);
+});
+
+function fetchUnconfirmedAttendance() {
+    fetch('/api/admin/unconfirmed-attendance')
+        .then(response => response.json())
+        .then(data => {
+            const badge = document.getElementById('unreadBadge');
+            const listContainer = document.getElementById('notificationList');
+
+            if (!badge || !listContainer) return;
+
+            // Update Badge (Dùng hidden của Tailwind thay vì d-none)
+            if (data.count > 0) {
+                badge.textContent = data.count > 99 ? '99+' : data.count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+
+            // Render Danh sách nhân viên chưa duyệt công với Tailwind CSS
+            if (data.items && data.items.length > 0) {
+                let html = '';
+                data.items.forEach(item => {
+                    html += `
+                        <li class="list-none">
+                            <a class="block px-4 py-3 hover:bg-slate-50 transition text-left no-underline" href="${item.url}">
+                                <div class="text-[13px] font-semibold text-slate-800">${item.hovaten}</div>
+                                <div class="text-[11.5px] text-slate-500 mt-0.5">Chưa được xác nhận công ngày <span class="font-medium text-slate-700">${item.date ? item.date.split('-').reverse().join('/') : ''}</span></div>
+                            </a>
+                        </li>
+                    `;
+                });
+                listContainer.innerHTML = html;
+            } else {
+                listContainer.innerHTML = `
+                    <li class="p-4 text-center text-xs text-slate-400 list-none">
+                        Không có nhân viên nào cần xác nhận công
+                    </li>
+                `;
+            }
+        })
+        .catch(err => console.error("Lỗi lấy thông báo công:", err));
+}
+
+// Bật/tắt hiển thị menu khi bấm vào chuông
+function toggleNotificationMenu(event) {
+    event.stopPropagation();
+    const dropdown = document.getElementById('notificationDropdown');
+    if (dropdown) {
+        dropdown.classList.toggle('hidden');
+    }
+}
+
+// Bấm ra ngoài vùng menu thì tự động đóng lại
+document.addEventListener('click', function (event) {
+    const dropdown = document.getElementById('notificationDropdown');
+    const btn = document.getElementById('bellNotificationBtn');
+    
+    if (dropdown && !dropdown.classList.contains('hidden')) {
+        if (!dropdown.contains(event.target) && !btn.contains(event.target)) {
+            dropdown.classList.add('hidden');
+        }
+    }
+});
+</script>
+
 {% block scripts %}{% endblock %}
 </body>
 </html>

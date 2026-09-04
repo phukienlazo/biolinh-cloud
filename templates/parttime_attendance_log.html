@@ -79,7 +79,7 @@
                 
                 <div class="flex items-center justify-between mb-3">
                   <div class="flex items-center gap-2">
-                    <span class="font-bold text-slate-900">{{ log.date }}</span>
+                    <span class="font-bold text-slate-900">{{ log.date |format_date}}</span>
                     {% if log.ca == 'sang' %}
                       <span class="px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md text-xs font-semibold">☀️ Sáng - IP: {{ log.ip_address if log.ip_address else 'N/A' }}</span>
                     {% elif log.ca == 'chieu' %}

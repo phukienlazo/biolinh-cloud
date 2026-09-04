@@ -1071,11 +1071,25 @@ def salary_management():
 
 @app.route("/")
 def home():
-    tong=0
+    # 1. Yêu cầu đăng nhập
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    # 2. Nếu là Admin thì chuyển hướng sang admin_dashboard
+    role = session.get('role')
+    if role == 'QTV':
+        return redirect(url_for('admin_dashboard'))
+    
+    # 3. Nhân viên & Part-time ở lại trang Home
+    tong = 0
     if os.path.exists(DONHANG_DB):
         try:
-            conn=get_donhang_db(); tong=conn.execute("SELECT COUNT(*) FROM tonghopdon").fetchone()[0]; conn.close()
-        except: pass
+            conn = get_donhang_db()
+            tong = conn.execute("SELECT COUNT(*) FROM tonghopdon").fetchone()[0]
+            conn.close()
+        except Exception:
+            pass
+            
     return render_template("home.html", tong_don=tong)
 
 @app.route('/ql-donhang')
@@ -1163,9 +1177,11 @@ def order_details(order_id):
 
 @app.route("/chamcong")
 def chamcong_index():
-    if 'user_id' not in session: return redirect(url_for('login'))
+    # 1. Kiểm tra đăng nhập
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
     
-    # Kiểm tra vai trò để điều hướng đến đúng trang dashboard
+    # 2. Điều hướng chấm công theo role
     role = session.get('role')
     if role == 'QTV':
         return redirect(url_for('admin_dashboard'))
@@ -1177,18 +1193,27 @@ def chamcong_index():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username=request.form['username'].strip()
-        password=request.form['password'].strip()
-        conn=get_db(); cur=conn.cursor()
+        username = request.form['username'].strip()
+        password = request.form['password'].strip()
+        
+        conn = get_db()
+        cur = conn.cursor()
         cur.execute("SELECT * FROM nv WHERE username = ? AND password = ?", (username, password))
-        user=cur.fetchone(); conn.close()
+        user = cur.fetchone()
+        conn.close()
+        
         if user:
-            session['user_id']=user['id']; session['username']=user['username']; session['hovaten']=user['hovaten']; session['role']=user['chucdanh']
-            flash('Đăng nhập thành công!', 'success')
-            return redirect(url_for('chamcong_index'))
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            session['hovaten'] = user['hovaten']
+            session['role'] = user['chucdanh']
             
+            flash('Đăng nhập thành công!', 'success')
+            # Đăng nhập thành công -> về trang chủ (home sẽ tự phân phối tiếp)
+            return redirect(url_for('home'))
         else:
             flash('Tên đăng nhập hoặc mật khẩu không đúng.', 'danger')
+            
     return render_template('login.html')
 
 
@@ -2099,20 +2124,109 @@ def api_reports_customers_inactive():
 
 @app.route("/api/reports/tonghop_don")
 def api_tonghop_don():
-    if session.get('role') != 'QTV': return jsonify({"error":"unauthorized"}),403
     try:
-        conn=get_donhang_db_safe(); cur=conn.cursor()
+        conn = get_donhang_db_safe()
+        cur = conn.cursor()
+        
+        # Kiểm tra sự tồn tại của bảng
         cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tonghopdon'")
         if not cur.fetchone():
-            conn.close(); return jsonify([])
-        rows=cur.execute("SELECT username, nickname, total_price, deposit, order_id FROM tonghopdon WHERE status='Đang Dồn'").fetchall()
-        grouped={}
+            conn.close()
+            return jsonify([])
+        
+        # Lấy thông tin tổng hợp đơn + đếm tổng số lượng sản phẩm từ bảng chitietdon
+        query = """
+            SELECT 
+                thd.username, 
+                thd.nickname, 
+                thd.total_price, 
+                thd.deposit, 
+                thd.order_id,
+                COALESCE(ct.item_count, 1) AS item_count
+            FROM tonghopdon thd
+            LEFT JOIN (
+                SELECT order_id, COUNT(*) AS item_count 
+                FROM chitietdon 
+                GROUP BY order_id
+            ) ct ON thd.order_id = ct.order_id
+            WHERE thd.status = 'Đang Dồn'
+        """
+        rows = cur.execute(query).fetchall()
+        
+        grouped = {}
         for r in rows:
-            uname=r['username']
-            if uname not in grouped: grouped[uname]={"username":uname,"nickname":r['nickname'],"total_price":0,"deposit":0,"order_ids":[],"order_count":0}
-            grouped[uname]["total_price"]+=clean_float(r['total_price']); grouped[uname]["deposit"]+=clean_float(r['deposit']); grouped[uname]["order_ids"].append(str(r['order_id'])); grouped[uname]["order_count"]+=1
-        result=sorted(grouped.values(), key=lambda x: x["deposit"]); conn.close(); return jsonify(result)
-    except Exception as e: print(e); return jsonify([])
+            uname = r['username']
+            if uname not in grouped:
+                grouped[uname] = {
+                    "username": uname,
+                    "nickname": r['nickname'],
+                    "total_price": 0,
+                    "deposit": 0,
+                    "order_ids": [],
+                    "order_count": 0,    # Vẫn giữ order_count nếu nơi khác cần dùng
+                    "total_items": 0     # Thêm trường Tổng số lượng sản phẩm
+                }
+            
+            grouped[uname]["total_price"] += clean_float(r['total_price'])
+            grouped[uname]["deposit"] += clean_float(r['deposit'])
+            grouped[uname]["order_ids"].append(str(r['order_id']))
+            grouped[uname]["order_count"] += 1
+            grouped[uname]["total_items"] += r['item_count']  # Cộng dồn số lượng sản phẩm
+            
+        result = sorted(grouped.values(), key=lambda x: x["deposit"])
+        conn.close()
+        return jsonify(result)
+        
+    except Exception as e:
+        print(e)
+        return jsonify([])
+
+@app.route("/api/reports/chitiet_don")
+def api_chitiet_don():
+    try:
+        conn = get_donhang_db_safe()
+        cur = conn.cursor()
+        
+        # 1. Kiểm tra tồn tại các bảng
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tonghopdon'")
+        if not cur.fetchone():
+            conn.close()
+            return jsonify({"total_items": 0, "total_value": 0, "order_count": 0})
+            
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='chitietdon'")
+        if not cur.fetchone():
+            conn.close()
+            return jsonify({"total_items": 0, "total_value": 0, "order_count": 0})
+
+        # 2. Lấy danh sách order_id của các đơn hàng có status = 'Đang Dồn'
+        rows = cur.execute("SELECT order_id FROM tonghopdon WHERE status='Đang Dồn'").fetchall()
+        order_ids = [str(r['order_id']) for r in rows if r['order_id']]
+
+        if not order_ids:
+            conn.close()
+            return jsonify({"total_items": 0, "total_value": 0, "order_count": 0})
+
+        # 3. Truy vấn bảng chitietdon dựa trên danh sách order_ids
+        placeholders = ','.join(['?'] * len(order_ids))
+        sql = f"""
+            SELECT COUNT(price) as total_items, COALESCE(SUM(price), 0) as total_value 
+            FROM chitietdon 
+            WHERE order_id IN ({placeholders})
+        """
+        res = cur.execute(sql, order_ids).fetchone()
+        
+        total_items = res['total_items'] if res else 0
+        total_value = clean_float(res['total_value']) if res else 0.0
+
+        conn.close()
+        return jsonify({
+            "total_items": total_items,
+            "total_value": total_value,
+            "order_count": len(order_ids)
+        })
+    except Exception as e:
+        print("Error in api_chitiet_don:", e)
+        return jsonify({"total_items": 0, "total_value": 0, "order_count": 0})
 
 @app.route("/api/taxes/pay", methods=["POST"])
 def api_taxes_pay():
@@ -3311,6 +3425,71 @@ def kygui_process_payment():
     return process_payment()
 
 ###############------------------- kết thúc phần ký gửi -----------------------###############
+
+
+
+#### API trả về danh sách công chưa xác nhận
+@app.route('/api/admin/unconfirmed-attendance', methods=['GET'])
+def api_unconfirmed_attendance():
+    if session.get('role') not in ['QTV', 'Admin']:
+        return jsonify({'count': 0, 'items': []}), 200
+
+    conn = get_db()
+    cur = conn.cursor()
+    unconfirmed_list = []
+
+    try:
+        # 1. Lấy danh sách công Part-time chưa duyệt (trang_thai = 'cho_duyet')
+        cur.execute("""
+            SELECT c.id AS log_id, c.employee_id, c.date, c.ca, n.hovaten, n.chucdanh
+            FROM cham_cong_part_time c
+            JOIN nv n ON c.employee_id = n.id
+            WHERE c.trang_thai = 'cho_duyet' OR c.trang_thai IS NULL
+            ORDER BY c.date DESC, c.id DESC
+        """)
+        pt_rows = cur.fetchall()
+
+        for r in pt_rows:
+            unconfirmed_list.append({
+                'log_id': r['log_id'],
+                'employee_id': r['employee_id'],
+                'hovaten': r['hovaten'],
+                'date': r['date'],
+                'ca_type': f"Part-time (Ca {r['ca'].upper()})",
+                'type': 'parttime',
+                # Đường dẫn trực tiếp về trang duyệt công của NV đó
+                'url': url_for('parttime_attendance_log', emp_id=r['employee_id'])
+            })
+
+        # Return JSON chứa tổng số lượng và chi tiết danh sách
+        return jsonify({
+            'count': len(unconfirmed_list),
+            'items': unconfirmed_list
+        })
+    except Exception as e:
+        print(f"Error api_unconfirmed_attendance: {e}")
+        return jsonify({'count': 0, 'items': []}), 500
+    finally:
+        conn.close()
+
+#### - convert thời gian sang dạng ngày tháng năm, chỉ cần thêm |format_date đằng sau thời gian là ok
+
+@app.template_filter('format_date')
+def format_date_filter(value):
+    if not value:
+        return ""
+    try:
+        # Nếu chuỗi dạng YYYY-MM-DD
+        parts = str(value).split('-')
+        if len(parts) == 3:
+            return f"{parts[2]}/{parts[1]}/{parts[0]}"
+    except Exception:
+        pass
+    return value
+#-----------------------------------------------------------------
+
+
+
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=8000, debug=True)

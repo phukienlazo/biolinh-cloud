@@ -180,7 +180,7 @@
                                 {% else %}
                                     {% for ps in phat_sinh %}
                                     <tr>
-                                        <td>{{ ps.date }}</td>
+                                        <td>{{ ps.date |format_date}}</td>
                                         <td>{{ ps.noidung }}</td>
                                         <td>
                                             {% if ps.loai == 'tang' %}
@@ -220,7 +220,7 @@
                                 {% else %}
                                     {% for h in history %}
                                     <tr>
-                                        <td><strong>{{ h.date }}</strong></td>
+                                        <td><strong>{{ h.date |format_date }}</strong></td>
                                         <td>
                                             {% if h.ca == 'sang' %}
                                                 <span class="badge bg-warning text-dark">Sáng</span>

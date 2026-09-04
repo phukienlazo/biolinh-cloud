@@ -118,7 +118,7 @@
                 {% else %}
                   {% for ps in phat_sinh %}
                   <tr class="hover:bg-slate-50">
-                    <td class="px-4 py-2.5 text-slate-600">{{ ps.date }}</td>
+                    <td class="px-4 py-2.5 text-slate-600">{{ ps.date |format_date }}</td>
                     <td class="px-4 py-2.5 font-medium text-slate-900">{{ ps.noidung }}</td>
                     <td class="px-4 py-2.5">{% if ps.loai == 'tang' %}<span class="px-2 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-[11px] font-semibold">Tăng +</span>{% else %}<span class="px-2 py-1 bg-red-50 text-red-700 border border-red-200 rounded-full text-[11px] font-semibold">Giảm -</span>{% endif %}</td>
                     <td class="px-4 py-2.5 text-right font-semibold">{{ "{:,.0f}".format(ps.sotien) }}₫</td>

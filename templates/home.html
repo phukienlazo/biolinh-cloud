@@ -1,10 +1,182 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Biolinh 2Hand - Hệ Thống Quản Lý Nội Bộ</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+            --bg-color: #f1f5f9;
+        }
 
-<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Biolinh 2Hand</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<style>body{background:#f8fafc}.card{border:none;border-radius:16px;box-shadow:0 4px 12px rgba(0,0,0,.08);transition:.2s}.card:hover{transform:translateY(-3px)}</style>
-</head><body><div class="container py-5" style="max-width:800px;text-align:center">
-<h1 class="text-primary fw-bold">BIOLINH 2HAND</h1><p class="text-muted">Hệ thống quản lý nội bộ</p>
-<div class="row g-4 mt-4">
-<div class="col-md-6"><a href="/donhang" class="text-decoration-none"><div class="card p-4"><div style="font-size:2.5rem">📦</div><h5 class="mt-2">Quản lý đơn hàng</h5></div></a></div>
-<div class="col-md-6"><a href="/chamcong" class="text-decoration-none"><div class="card p-4"><div style="font-size:2.5rem">⏰</div><h5 class="mt-2">Chấm công nhân viên</h5></div></a></div>
-</div></div></body></html>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: #0f172a;
+            min-height: 100vh;
+        }
+
+        /* Top Bar Header */
+        .header-bar {
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .user-badge {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 50px;
+            padding: 6px 16px;
+        }
+
+        .btn-logout {
+            border-radius: 50px;
+            padding: 6px 18px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        /* Hero Banner */
+        .hero-section {
+            background: var(--primary-gradient);
+            border-radius: 24px;
+            color: #ffffff;
+            box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.3);
+        }
+
+        /* Feature Cards */
+        .action-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 32px 24px;
+            text-decoration: none !important;
+            display: block;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .action-card:hover {
+            transform: translateY(-6px);
+            border-color: #3b82f6;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+        }
+
+        .icon-box {
+            width: 64px;
+            height: 64px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.75rem;
+            margin-bottom: 20px;
+            transition: transform 0.25s ease;
+        }
+
+        .action-card:hover .icon-box {
+            transform: scale(1.1);
+        }
+
+        .icon-orders {
+            background: #eff6ff;
+            color: #2563eb;
+        }
+
+        .icon-attendance {
+            background: #f0fdf4;
+            color: #16a34a;
+        }
+
+        .card-badge {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background: #f1f5f9;
+            color: #475569;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header / Navbar -->
+    <header class="header-bar sticky-top py-3 mb-4">
+        <div class="container" style="max-width: 900px;">
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="user-badge d-flex align-items-center gap-2">
+                        <i class="bi bi-person-circle text-primary fs-5"></i>
+                        <div>
+                            <span class="text-muted small d-block" style="line-height: 1;">Tài khoản</span>
+                            <strong class="text-dark small">{{ session.hovaten or 'Nhân viên' }}</strong>
+                        </div>
+                    </div>
+                </div>
+                
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm btn-logout d-flex align-items-center gap-2">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>Đăng xuất</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container py-2" style="max-width: 900px;">
+        
+        <!-- Hero Section -->
+        <!--<div class="hero-section p-4 p-md-5 mb-4 text-center">
+            <span class="badge bg-white text-primary mb-2 px-3 py-2 rounded-pill fw-bold text-uppercase tracking-wide" style="font-size: 0.75rem;">Dashboard</span>
+            <h1 class="fw-bold display-6 mb-2">BIOLINH 2HAND</h1>
+            <p class="mb-0 text-white-50">Hệ thống quản lý đơn hàng & ca làm việc nội bộ</p>
+        </div>-->
+
+        <!-- Navigation Cards Grid -->
+        <div class="row g-4">
+            
+            <!-- Quản lý đơn hàng -->
+            <div class="col-md-6">
+                <a href="/donhang" class="action-card h-100">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="icon-box icon-orders">
+                            <i class="bi bi-box-seam-fill"></i>
+                        </div>
+                        {% if tong_don is defined %}
+                        <span class="card-badge">
+                            <i class="bi bi-archive me-1"></i> {{ tong_don }} đơn
+                        </span>
+                        {% endif %}
+                    </div>
+                    <h4 class="fw-bold text-dark mb-1">Quản lý đơn hàng</h4>
+                    <p class="text-muted small mb-0">Theo dõi, tra cứu và tổng hợp danh sách đơn hàng toàn hệ thống.</p>
+                </a>
+            </div>
+
+            <!-- Chấm công nhân viên -->
+            <div class="col-md-6">
+                <a href="/chamcong" class="action-card h-100">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="icon-box icon-attendance">
+                            <i class="bi bi-clock-history"></i>
+                        </div>
+                        <span class="card-badge">
+                            <i class="bi bi-check-circle-fill text-success me-1"></i> Trực tuyến
+                        </span>
+                    </div>
+                    <h4 class="fw-bold text-dark mb-1">Chấm công</h4>
+                    <p class="text-muted small mb-0">Ghi nhận thời gian làm việc thực tế của nhân viên, tra cứu thu nhập theo thời gian thực</p>
+                </a>
+            </div>
+
+        </div>
+
+    </main>
+
+</body>
+</html>

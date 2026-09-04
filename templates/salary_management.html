@@ -91,7 +91,7 @@
           {% else %}
             {% for p in payments %}
             <tr class="hover:bg-slate-50/80 transition">
-              <td class="px-4 py-3 font-medium text-slate-600"><code class="px-2 py-1 bg-slate-100 rounded text-xs">{{ p.payment_date }}</code></td>
+              <td class="px-4 py-3 font-medium text-slate-600"><code class="px-2 py-1 bg-slate-100 rounded text-xs">{{ p.payment_date[:10] |format_date }}</code></td>
               <td class="px-4 py-3">
                 <div class="font-semibold text-slate-900">{{ p.hovaten }}</div>
                 <div class="text-xs text-slate-400">@{{ p.username }}</div>
@@ -131,7 +131,7 @@
                   data-hovaten="{{ p.hovaten }}"
                   data-username="{{ p.username }}"
                   data-chucdanh="{{ p.chucdanh }}"
-                  data-paymentdate="{{ p.payment_date }}"
+                  data-paymentdate="{{ p.payment_date[:10] |format_date }}"
                   data-dongia="{% if p.chucdanh == 'parttime' %}{{ '{:,.0f}'.format(p.luong_theo_gio or 0) }}{% else %}{{ '{:,.0f}'.format(p.luong_co_ban or 0) }}{% endif %}"
                   data-khoiluong="{% if p.chucdanh == 'parttime' %}{{ '%.1f'|format(p.gio_lam or 0) }}{% else %}{{ '%.1f'|format(p.tong_cong or 0) }}{% endif %}"
                   data-donvi="{% if p.chucdanh == 'parttime' %}giờ{% else %}công{% endif %}"
@@ -342,7 +342,7 @@ document.querySelectorAll('.btn-open-payslip').forEach(btn => {
         const formattedAmount = sign + absAmount.toLocaleString('vi-VN') + '₫';
 
         tr.innerHTML = `
-          <td class="p-1.5 text-slate-500 whitespace-nowrap">${item.date || '-'}</td>
+          <td class="p-1.5 text-slate-500 whitespace-nowrap">${formatDateVN(item.date) || '-'}</td>
           <td class="p-1.5 text-slate-800 font-medium">${item.noidung || '-'}</td>
           <td class="p-1.5 text-right whitespace-nowrap ${colorClass}">${formattedAmount}</td>
         `;
@@ -365,6 +365,33 @@ document.getElementById('btnClosePayslip')?.addEventListener('click', () => {
 // Copy Text
 document.getElementById('btnCopyPayslip')?.addEventListener('click', () => {
   const d = currentPayslipData;
+
+  // --- XỬ LÝ CHUỖI CHI TIẾT PHÁT SINH ---
+  let detailsText = '';
+  let listPS = [];
+  try {
+    listPS = typeof d.chi_tiet_ps === 'string' ? JSON.parse(d.chi_tiet_ps || '[]') : (d.chi_tiet_ps || []);
+  } catch (err) {
+    listPS = [];
+  }
+
+  if (listPS && listPS.length > 0) {
+    const lines = listPS.map(item => {
+      const loaiNorm = (item.loai || '').toLowerCase().trim();
+      const isTang = loaiNorm === 'tang' || loaiNorm === 'thuong';
+      const sign = isTang ? '+' : '-';
+      const absAmount = Math.abs(Number(item.sotien || 0));
+      const formattedAmount = sign + absAmount.toLocaleString('vi-VN') + '₫';
+      const formattedDate = formatDateVN(item.date);
+      
+      const datePart = formattedDate ? `[${formattedDate}] ` : '';
+      return `  └ ${datePart}${item.noidung || 'Phát sinh'}: ${formattedAmount}`;
+    });
+
+    detailsText = '\n📋 Chi tiết các khoản phát sinh:\n' + lines.join('\n');
+  }
+
+  // --- GHÉP NỘI DUNG SAO CHÉP ---
   const text = `🧾 ***PHIẾU THANH TOÁN LƯƠNG - BIOLINH 2HAND*** 🧾
 ----------------------------------------
 👤 Nhân sự: ${d.hovaten} (@${d.username})
@@ -374,7 +401,7 @@ document.getElementById('btnCopyPayslip')?.addEventListener('click', () => {
 • Đơn giá định mức: ${d.don_gia}₫
 • Khối lượng làm: ${d.khoi_luong} ${d.don_vi}
 • Thu nhập ước tính: ${d.thu_nhap}₫
-• Phát sinh (Thưởng/Phạt): ${d.phat_sinh}₫
+• Phát sinh (Thưởng/Phạt): ${d.phat_sinh}₫${detailsText}
 ----------------------------------------
 💰 **TỔNG THỰC NHẬN: ${d.thuc_nhan}₫**
 ----------------------------------------
@@ -386,7 +413,6 @@ Cảm ơn bạn đã cống hiến cho Biolinh 2Hand!`;
     alert('Khung bảo mật trình duyệt chặn sao chép tự động.');
   });
 });
-
 // Tải ảnh PNG
 document.getElementById('btnDownloadPayslip')?.addEventListener('click', () => {
   const target = document.getElementById('payslipCard');
@@ -415,5 +441,17 @@ document.getElementById('btnPrintPayslip')?.addEventListener('click', () => {
   document.body.innerHTML = originalContents;
   window.location.reload();
 });
+
+// Hàm chuyển đổi yyyy-mm-dd thành dd/mm/yyyy
+function formatDateVN(dateStr) {
+  if (!dateStr) return '';
+  // Cắt lấy 10 ký tự đầu yyyy-mm-dd (phòng trường hợp có ngày giờ)
+  const cleanDate = dateStr.trim().substring(0, 10);
+  const parts = cleanDate.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+}
 </script>
 {% endblock %}

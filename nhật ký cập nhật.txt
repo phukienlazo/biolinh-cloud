@@ -4,3 +4,10 @@ thêm sync 2 chiều và code quản lý đơn hàng, ký gửi, đối soát...
 thêm chấm công cho part-time và báo cáo trả lương, phiếu lương
 21/08/2026:
 sửa lỗi sync báo 500 ở client, sửa báo cáo phần khách hàng đã thanh toán từ total_payment -> revenue (total_price)
+03/09/2026
+sửa phần chuông thông báo cho các nhân viên parttime chưa được duyệt công, sửa lại định dạng ngày về ngày tháng năm cho các trang
+bắt buộc phải đăng nhập mới xem được đơn hàng và chấm công
+sửa lại giao diện trang home và trang xem đơn hàng (donhang.html) có thể xem được tổng sản phẩm, click vào từng đơn hàng xem chi tiết
+báo cáo kho fix hiển thị số lượng sản phẩm, thêm giá trị tồn kho, thêm click đơn hàng xem chi tiết giống donhang.html
+sửa định dạng ngày cho thanh toán lương và phiếu lương
+

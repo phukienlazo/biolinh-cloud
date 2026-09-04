@@ -15,8 +15,9 @@
             --danger: #ef4444;
         }
         body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; margin: 0; padding: 15px; background-color: var(--bg-color); color: var(--text-main); }
-        .header { text-align: center; margin-bottom: 20px; }
+        .header { position: relative; text-align: center; margin-bottom: 20px; }
         .header h1 { font-size: 1.4rem; color: var(--primary-color); margin: 0; text-transform: uppercase; }
+        .home-btn { position: absolute; left: 0; top: 50%; transform: translateY(-50%); text-decoration: none; font-size: 1.2rem; background: #fff; border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 10px; color: var(--text-main); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .container { max-width: 900px; margin: 0 auto; }
         .search-container { margin-bottom: 15px; }
         #searchInput { width: 100%; padding: 12px 16px; border: 2px solid var(--border-color); border-radius: 12px; font-size: 16px; outline: none; box-sizing: border-box; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
@@ -27,27 +28,27 @@
         .table-card { background: var(--card-bg); border-radius:12px; box-shadow:0 4px 6px -1px rgba(0,0,0,0.1); overflow:hidden; }
         table { width:100%; border-collapse:collapse; }
         th { background:#f1f5f9; color:var(--secondary-color); padding:12px; text-align:left; font-size:0.8rem; text-transform:uppercase; border-bottom:2px solid var(--border-color); }
-        td { padding:12px; border-bottom:1px solid var(--border-color); cursor:pointer; }
+        td { padding:12px; border-bottom:1px solid var(--border-color); }
         tr:hover td { background:#f8fafc; }
-        .id-badge { background:#dbeafe; color:#1e40af; padding:4px 8px; border-radius:6px; font-weight:bold; font-size:0.8rem; }
+        
+        /* Thẻ Nút Mã Đơn hàng có thể Click */
+        .id-badge-btn { display: inline-block; background: #dbeafe; color: #1e40af; padding: 4px 8px; border-radius: 6px; font-weight: bold; font-size: 0.8rem; cursor: pointer; border: 1px solid #bfdbfe; transition: all 0.2s; margin: 2px 3px 2px 0; }
+        .id-badge-btn:hover { background: #2563eb; color: #ffffff; border-color: #1d4ed8; }
+        
         .price-cell { text-align:right; font-weight:600; color:#e11d48; white-space:nowrap; }
-        tr.row-warning { outline:2px solid var(--danger); outline-offset:-2px; background:#fef2f2; }
-        tr.row-warning td { background:#fef2f2 !important; border-bottom:1px solid #fecaca; }
-        tr.row-warning:hover td { background:#fee2e2 !important; }
-        tr.row-warning td:first-child { border-left:3px solid var(--danger); }
-        tr.row-warning td:last-child { border-right:3px solid var(--danger); }
-        .warn-badge { display:inline-block; background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; font-size:0.65rem; padding:2px 6px; border-radius:10px; margin-left:6px; font-weight:700; }
-        /* Mobile: chỉ hiện Mã Đơn + Nickname */
-        @media (max-width: 700px) {
-            th:nth-child(3), td:nth-child(3),
-            th:nth-child(4), td:nth-child(4) {
-                display:none;
-            }
-            th:nth-child(2), td:nth-child(2) {
-                width: 65%;
-            }
-            .container { padding: 0 5px; }
+        .warn-badge { display:inline-block; background:#fee2e2; color:#991b1b; border:1px solid #fca5a5; font-size:0.7rem; padding:2px 8px; border-radius:10px; font-weight:700; white-space:nowrap; }
+        .item-count-badge { background:#dcfce7; color:#15803d; font-weight:bold; padding:3px 10px; border-radius:12px; font-size:0.85rem; white-space:nowrap; }
+        
+        /* CSS Responsive cho Bảng danh sách Tổng hợp */
+        @media (max-width: 650px) {
+            #classifyTable thead { display: none; }
+            #classifyTable, #classifyTable tbody, #classifyTable tr, #classifyTable td { display: block; width: 100%; box-sizing: border-box; }
+            #classifyTable tr { margin-bottom: 10px; background: #ffffff; border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+            #classifyTable td { padding: 4px 0 !important; border: none !important; text-align: left !important; }
+            .mobile-row-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+            .mobile-row-bottom { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; font-size: 0.85rem; flex-wrap: wrap; gap: 4px; }
         }
+        
         .modal { display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(15,23,42,0.6); backdrop-filter:blur(4px); }
         .modal-content { background:#fff; margin:5% auto; width:92%; max-width:450px; border-radius:20px; position:relative; animation:modalPop 0.3s cubic-bezier(0.34,1.56,0.64,1); overflow:hidden; }
         @keyframes modalPop { from{transform:scale(0.9); opacity:0} to{transform:scale(1); opacity:1} }
@@ -65,46 +66,40 @@
 </head>
 <body>
     <div class="header">
+        <a href="/" class="home-btn" title="Trang chủ">🏠</a>
         <h1>Biolinh 2Hand</h1>
         <div style="font-size:0.8rem; color:var(--secondary-color);">HỆ THỐNG QUẢN LÝ ĐƠN HÀNG</div>
     </div>
     <div class="container">
+        <!-- LIVESEARCH DÙNG CHUNG -->
         <div class="search-container">
-            <input type="text" id="searchInput" placeholder="Tìm kiếm tên, ID, mã đơn...">
+            <input type="text" id="searchInput" onkeyup="filterClassifyTable()" placeholder="🔍 Tìm theo Nickname, Username, Mã đơn...">
         </div>
+        
+        <!-- THANH THỐNG KÊ TỔNG HỢP -->
         <div class="stats-bar">
-            <div class="stat-chip">Tổng đơn Đang Dồn: <strong>{{ data|length }}</strong></div>
-            <div class="stat-chip danger" id="warnCountChip" style="display:none">Đơn dư tiền cọc: <strong id="warnCount">0</strong></div>
+            <div class="stat-chip"><strong>{{ data|length }}</strong> đơn</div>
+            <div class="stat-chip danger" id="warnCountChip" style="display:none"><strong id="warnCount">0</strong> đơn</div>
+            <div class="stat-chip" id="classifyTotalStat" style="font-weight:600; color:var(--primary-color);">0 sản phẩm</div>
         </div>
+
+        <!-- BẢNG TỔNG HỢP CHÍNH -->
         <div class="table-card">
-            <table id="ordersTable">
+            <table id="classifyTable">
                 <thead>
                     <tr>
-                        <th width="100">Mã Đơn</th>
-                        <th>Nick Tiktok</th>
-                        <th>ID Tiktok</th>
-                        <th style="text-align:right">Tổng Đơn</th>
+                        <th>Nick Tiktok / ID</th>
+                        <th>Mã Đơn Hàng (Bấm xem chi tiết)</th>
                     </tr>
                 </thead>
-                <tbody>
-                    {% for row in data %}
-                    <tr onclick="loadDetails('{{ row.order_id }}')" class="{% if row.is_warning %}row-warning{% endif %}" title="{% if row.is_warning %}Khách này dư cọc: {{ row.balance }} (price - deposit){% endif %}">
-                        <td><span class="id-badge">{{ row.order_id }}</span></td>
-                        <td><strong>{{ row.nickname }}</strong>{% if row.is_warning %}<span class="warn-badge">DƯ CỌC</span>{% endif %}</td>
-                        <td style="color:var(--secondary-color);">@{{ row.username }}</td>
-                        <td class="price-cell">{{ "{:,.0f}".format(row.price) }} đ</td>
-                    </tr>
-                    {% endfor %}
-                    {% if data|length == 0 %}
-                    <tr><td colspan="4" style="text-align:center; padding:30px; color:#64748b">Không có đơn nào ở trạng thái "Đang Dồn"</td></tr>
-                    {% endif %}
+                <tbody id="classifyTableBody">
+                    <tr><td colspan="3" style="text-align:center; padding:30px; color:#64748b;">Đang tải dữ liệu tổng hợp...</td></tr>
                 </tbody>
             </table>
         </div>
-        <div style="margin-top:10px; font-size:0.75rem; color:#64748b">
-            * Viền đỏ cảnh báo khi tổng tiền cọc của khách hàng thừa quá nhiều, chưa thể đi đơn được, nên chưa cần làm vội khi chưa có yêu cầu
-        </div>
     </div>
+
+    <!-- MODAL XEM CHI TIẾT ĐƠN HÀNG GIỮ NGUYÊN 100% LOGIC CỦA BẠN -->
     <div id="orderModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -126,40 +121,155 @@
             </div>
         </div>
     </div>
+
+    <!-- DANH SÁCH KHÁCH CÓ CẢNH BÁO DƯ CỌC TỪ JINJA BACKEND -->
     <script>
+        const warningUsers = new Set([
+            {% for row in data %}
+                {% if row.is_warning %}
+                    "{{ row.username }}",
+                {% endif %}
+            {% endfor %}
+        ]);
+    </script>
+
+    <script>
+        // --- LOGIC VÀ TÊN HÀM CŨ GIỮ NGUYÊN 100% ---
         const modal = document.getElementById("orderModal");
-        function closeModal(){ modal.style.display="none"; }
-        window.onclick = function(e){ if(e.target==modal) closeModal(); }
+        
+        function closeModal(){ 
+            modal.style.display = "none"; 
+        }
+        
+        window.onclick = function(e){ 
+            if(e.target == modal) closeModal(); 
+        }
+        
         function loadDetails(orderId){
-            modal.style.display="block";
+            modal.style.display = "block";
             fetch(`/order-details/${orderId}`).then(r=>r.json()).then(data=>{
-                document.getElementById('m_order_id').innerText=data.order_id;
-                document.getElementById('m_nickname').innerText=data.nickname;
-                document.getElementById('m_username').innerText=data.username;
-                document.getElementById('m_total_items').innerText=data.total_items;
-                const cleanTotal=(data.total_price||"0").toString().replace(/,/g,'');
-                document.getElementById('m_total_price').innerText=Number(cleanTotal).toLocaleString('vi-VN');
-                const tb=document.getElementById('m_order_details'); tb.innerHTML='';
-                (data.prices||[]).forEach((price,i)=>{
-                    const raw=Array.isArray(price)?price[0]:price;
-                    const cp=(raw||"0").toString().replace(/,/g,'');
-                    tb.innerHTML+=`<tr><td style="padding:10px 0; border-bottom:1px solid #f1f5f9;">#${i+1}</td><td align="right" style="font-weight:500;">${Number(cp).toLocaleString('vi-VN')} đ</td></tr>`;
+                document.getElementById('m_order_id').innerText = data.order_id;
+                document.getElementById('m_nickname').innerText = data.nickname;
+                document.getElementById('m_username').innerText = data.username;
+                document.getElementById('m_total_items').innerText = data.total_items;
+                const cleanTotal = (data.total_price||"0").toString().replace(/,/g,'');
+                document.getElementById('m_total_price').innerText = Number(cleanTotal).toLocaleString('vi-VN');
+                const tb = document.getElementById('m_order_details'); 
+                tb.innerHTML = '';
+                (data.prices||[]).forEach((price, i)=>{
+                    const raw = Array.isArray(price)?price[0]:price;
+                    const cp = (raw||"0").toString().replace(/,/g,'');
+                    tb.innerHTML += `<tr><td style="padding:10px 0; border-bottom:1px solid #f1f5f9;">#${i+1}</td><td align="right" style="font-weight:500;">${Number(cp).toLocaleString('vi-VN')} đ</td></tr>`;
                 });
             }).catch(()=>alert("Lỗi kết nối dữ liệu!"));
         }
-        document.getElementById("searchInput").addEventListener("keyup", function(){
-            const kw=this.value.toLowerCase().trim();
-            document.querySelectorAll("#ordersTable tbody tr").forEach(row=>{
-                row.style.display=row.innerText.toLowerCase().includes(kw)?"":"none";
-            });
-        });
-        (function(){
-            const warns=document.querySelectorAll('tr.row-warning');
-            if(warns.length>0){
-                document.getElementById('warnCount').innerText=warns.length;
-                document.getElementById('warnCountChip').style.display='inline-block';
+
+        // --- XỬ LÝ LOAD VÀ HIỂN THỊ DỮ LIỆU TỔNG HỢP TRÊN TRANG CHÍNH ---
+        let classifyData = [];
+
+        function loadClassifyData() {
+            fetch('/api/reports/tonghop_don')
+                .then(res => res.json())
+                .then(data => {
+                    classifyData = data;
+                    renderClassifyTable(data);
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('classifyTableBody').innerHTML = '<tr><td colspan="3" style="text-align:center; color:red; padding:20px;">Lỗi tải dữ liệu tổng hợp!</td></tr>';
+                });
+        }
+
+        function renderClassifyTable(dataList) {
+            const tbody = document.getElementById('classifyTableBody');
+            tbody.innerHTML = '';
+
+            if (!dataList || dataList.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:30px; color:#64748b;">Không có dữ liệu đơn dồn</td></tr>';
+                document.getElementById('classifyTotalStat').innerText = '0 sản phẩm';
+                return;
             }
-        })();
+
+            let totalItemsAll = 0;
+            let warnCount = 0;
+
+            dataList.forEach(item => {
+                const itemCount = item.total_items || item.order_count || 0;
+                totalItemsAll += itemCount;
+
+                // Kiểm tra xem khách hàng này có bị dư cọc không
+                const isWarn = warningUsers.has(item.username);
+                if (isWarn) warnCount++;
+
+                // Lấy mảng danh sách mã đơn
+                let rawOrders = Array.isArray(item.order_ids) ? item.order_ids : (item.order_ids ? [item.order_ids] : []);
+                
+                // Tạo danh sách các Button Mã đơn hàng (Cắt 8 ký tự đầu, click gọi loadDetails)
+                let orderButtonsHTML = rawOrders.map(fullId => {
+                    const shortId = String(fullId).trim().slice(0, 8);
+                    return `<span class="id-badge-btn" onclick="loadDetails('${fullId}')" title="Click xem chi tiết đơn ${fullId}">${shortId}</span>`;
+                }).join('');
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <!-- Cột Nickname / Username -->
+                    <td class="mobile-row-top">
+                        <div>
+                            <strong>${item.nickname || ''}</strong>
+                            <span style="color:var(--secondary-color); font-size:0.85rem; margin-left:4px;">id: ${item.username || ''}</span>
+                        </div>
+                        <!-- Cột số lượng SP trên Mobile -->
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <span class="item-count-badge">Tổng: ${itemCount} sp</span>
+                            ${isWarn ? '<span class="warn-badge">DƯ CỌC</span>' : ''}
+                            
+                        </div>
+                    </td>
+                    
+                    <!-- Cột Mã đơn (Dạng button thẻ) -->
+                    <td class="mobile-row-bottom">
+                        <span style="color:var(--secondary-color); font-size:0.8rem; display:none;" class="mobile-label">Đơn:</span>
+                        <div>${orderButtonsHTML}</div>
+                    </td>
+                    
+                    <!-- Cột Số lượng & Cảnh báo Dư Cọc trên PC -->
+                    <td style="text-align:center; display:none;" class="pc-col">
+                        <div style="display:flex; gap:6px; justify-content:center; align-items:center;">
+                            ${isWarn ? '<span class="warn-badge">DƯ CỌC</span>' : ''}
+                            <span class="item-count-badge">${itemCount} sp</span>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Cập nhật các con số thống kê
+            document.getElementById('classifyTotalStat').innerHTML = `<b>${totalItemsAll.toLocaleString('vi-VN')}</b> sản phẩm`;
+            
+            if (warnCount > 0) {
+                document.getElementById('warnCount').innerText = warnCount;
+                document.getElementById('warnCountChip').style.display = 'inline-block';
+            } else {
+                document.getElementById('warnCountChip').style.display = 'none';
+            }
+        }
+
+        // LIVESEARCH LỌC TẬP DỮ LIỆU
+        function filterClassifyTable() {
+            const kw = document.getElementById('searchInput').value.toLowerCase().trim();
+            const filtered = classifyData.filter(item => {
+                const nick = (item.nickname || '').toLowerCase();
+                const user = (item.username || '').toLowerCase();
+                const orders = Array.isArray(item.order_ids) ? item.order_ids.join(' ').toLowerCase() : (item.order_ids || '').toLowerCase();
+                return nick.includes(kw) || user.includes(kw) || orders.includes(kw);
+            });
+            renderClassifyTable(filtered);
+        }
+
+        // Khởi chạy khi load xong trang
+        document.addEventListener("DOMContentLoaded", function() {
+            loadClassifyData();
+        });
     </script>
 </body>
 </html>

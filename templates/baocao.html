@@ -20,6 +20,41 @@
   #tab-s2a{display:block !important}
   #print-s2a-container{width:100% !important; border:none !important; box-shadow:none !important;}
 }
+
+/* Style cho thẻ mã đơn có thể click */
+.id-badge-btn {
+  display: inline-block;
+  background: #dbeafe;
+  color: #1e40af;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-weight: bold;
+  font-size: 0.75rem;
+  font-family: monospace;
+  cursor: pointer;
+  border: 1px solid #bfdbfe;
+  transition: all 0.2s;
+  margin: 2px 4px 2px 0;
+}
+.id-badge-btn:hover {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #1d4ed8;
+}
+
+/* Modal chi tiết đơn hàng đồng bộ donhang.html */
+.modal { display:none; position:fixed; z-index:1000; left:0; top:0; width:100%; height:100%; background:rgba(15,23,42,0.6); backdrop-filter:blur(4px); }
+.modal-content { background:#fff; margin:5% auto; width:92%; max-width:450px; border-radius:20px; position:relative; overflow:hidden; }
+.modal-header { padding:16px 20px; background:#2563eb; color:white; display:flex; justify-content:space-between; align-items:center; }
+.modal-header h2 { margin:0; font-size:1.1rem; font-weight:bold; }
+.close-btn { font-size:24px; cursor:pointer; }
+.modal-body { padding:20px; max-height:75vh; overflow-y:auto; }
+.info-card { background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:15px; margin-bottom:20px; display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.info-label { font-size:0.7rem; color:#64748b; text-transform:uppercase; display:block; margin-bottom:2px; }
+.info-value { font-weight:600; font-size:0.95rem; color:#1e293b; }
+.price-total { grid-column:span 2; border-top:1px dashed #e2e8f0; padding-top:10px; color:#e11d48; font-size:1.2rem; font-weight:800; }
+.detail-list-table { width:100%; font-size:0.9rem; }
+.detail-list-table th { background:transparent; border-bottom:1px solid #e2e8f0; padding:8px 0; text-align:left; }
 </style>
 {% endblock %}
 
@@ -234,20 +269,32 @@
 
   
   <div id="tab-kho" class="tab-pane hidden space-y-4">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <!-- Thẻ 1: Tổng đơn -->
       <div class="bg-white rounded-2xl border border-slate-200 p-5 text-center shadow-sm">
         <div class="text-3xl">🧾</div>
         <div class="text-2xl font-bold mt-2 text-slate-900" id="khoTongDonKho">0</div>
         <div class="text-[11px] tracking-widest text-slate-500 font-semibold mt-1">TỔNG ĐƠN TRONG KHO (chốt chưa vận chuyển)</div>
         <div class="text-[11px] text-slate-400 mt-1" id="khoTongDonKhoSub">0 khách • 0₫ tổng</div>
       </div>
+
+      <!-- Thẻ 2: Tổng số lượng sản phẩm -->
       <div class="bg-white rounded-2xl border border-slate-200 p-5 text-center shadow-sm">
         <div class="text-3xl">📦</div>
         <div class="text-2xl font-bold mt-2 text-slate-900" id="khoTongSPKho">0</div>
         <div class="text-[11px] tracking-widest text-slate-500 font-semibold mt-1">TỔNG SỐ LƯỢNG HÀNG HÓA (SP trong kho)</div>
-        <div class="text-[11px] text-slate-400 mt-1" id="khoTongSPKhoSub">Từ bảng tonghopdon • Đang Dồn</div>
+        <div class="text-[11px] text-slate-400 mt-1" id="khoTongSPKhoSub">Từ bảng chitietdon • Đang Dồn</div>
+      </div>
+
+      <!-- Thẻ 3: Tổng giá trị hàng hóa (Mới bổ sung) -->
+      <div class="bg-white rounded-2xl border border-slate-200 p-5 text-center shadow-sm">
+        <div class="text-3xl">💰</div>
+        <div class="text-2xl font-bold mt-2 text-emerald-600" id="khoTongGiaTriKho">0₫</div>
+        <div class="text-[11px] tracking-widest text-slate-500 font-semibold mt-1">TỔNG GIÁ TRỊ HÀNG HÓA</div>
+        <div class="text-[11px] text-slate-400 mt-1" id="khoTongGiaTriKhoSub">Tổng giá price các đơn Đang Dồn</div>
       </div>
     </div>
+  </div>
     <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div class="p-4 border-b space-y-3">
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
@@ -506,27 +553,70 @@ function renderKhoTable(){
   filtered.forEach((d,idx)=>{
     t_money+=d.total_price||0; t_deposit+=d.deposit||0; t_orders+=d.order_count||0;
     const con_thieu=(d.total_price||0)-(d.deposit||0);
-    const maDonList = (d.order_ids || []).map(id => { const s=String(id); return s.substring(0,8); });
-    const maDonDisplay = maDonList.map(m => '<span class="font-mono text-[11px] bg-slate-100 px-1.5 py-0.5 rounded mr-1 inline-block mb-1">'+m+'</span>').join('');
-    html+='<tr class="hover:bg-slate-50"><td class="px-3 py-2.5">'+(idx+1)+'</td><td class="px-3 py-2.5 font-bold text-blue-600">'+d.nickname+'</td><td class="px-3 py-2.5">'+d.username+'</td><td class="px-3 py-2.5 text-right font-bold">'+fmt(d.total_price)+'</td><td class="px-3 py-2.5 text-right text-emerald-600 font-bold">'+fmt(d.deposit)+'</td><td class="px-3 py-2.5 text-right font-bold '+(con_thieu<=-19000?'text-emerald-600':'text-red-600')+'">'+fmt(con_thieu)+'</td><td class="px-3 py-2.5"><div class="flex flex-wrap max-w-[220px]">'+maDonDisplay+'</div></td><td class="px-3 py-2.5 text-center"><span class="px-2 py-0.5 bg-slate-100 rounded-full text-xs">'+d.order_count+'</span></td></tr>';
+    const maDonDisplay = (d.order_ids || []).map(id => {
+      const fullId = String(id).trim();
+      const shortId = fullId.substring(0, 8);
+      return `<span class="id-badge-btn" onclick="loadDetails('${fullId}')" title="Click xem chi tiết: ${fullId}">${shortId}</span>`;
+    }).join('');
+    html+='<tr class="hover:bg-slate-50"><td class="px-3 py-2.5">'+(idx+1)+'</td><td class="px-3 py-2.5 font-bold text-blue-600">'+d.nickname+'</td><td class="px-3 py-2.5">'+d.username+'</td><td class="px-3 py-2.5 text-right font-bold">'+fmt(d.total_price)+'</td><td class="px-3 py-2.5 text-right text-emerald-600 font-bold">'+fmt(d.deposit)+'</td><td class="px-3 py-2.5 text-right font-bold '+(con_thieu<=-19000?'text-emerald-600':'text-red-600')+'">'+fmt(con_thieu)+'</td><td class="px-3 py-2.5"><div class="flex flex-wrap max-w-[220px]">'+maDonDisplay+'</div></td><td class="px-3 py-2.5 text-center"><span class="px-2 py-0.5 bg-slate-100 rounded-full text-xs">'+(d.total_items || d.item_count || d.quantity || d.order_count || 0)+'</span></td></tr>';
   });
   tbody.innerHTML=html;
-  document.getElementById('khoStatsLabel').innerHTML='Hiển thị: <b>'+filtered.length+'</b> khách / Tổng: <b>'+khoRawData.length+'</b> khách • Đã chốt <b>'+t_orders+'</b> đơn • Tổng tiền: <b>'+fmt(t_money)+'</b> • Cọc: <b>'+fmt(t_deposit)+'</b>';
+  const t_items = filtered.reduce((sum, d) => sum + (d.total_items || d.item_count || d.quantity || 0), 0);
+
+document.getElementById('khoStatsLabel').innerHTML='Hiển thị: <b>'+filtered.length+'</b> khách / Tổng: <b>'+khoRawData.length+'</b> khách • Tổng số lượng: <b>'+fmtNum(t_items)+'</b> sản phẩm • Tổng tiền: <b>'+fmt(t_money)+'</b> • Cọc: <b>'+fmt(t_deposit)+'</b>';
 }
-async function fetchTongHopDon(){
-  const tbody=document.getElementById('khoBody'); tbody.innerHTML='<tr><td colspan="8" class="text-center py-10 text-slate-400">Đang tải kho từ tonghopdon...</td></tr>';
-  try{
-    const res=await fetch('/api/reports/tonghop_don'); const data=await res.json(); khoRawData = data||[];
-    if(khoRawData.length>0){
-      const totalOrders = khoRawData.reduce((s,x)=>s+(x.order_count||0),0);
-      const totalMoney = khoRawData.reduce((s,x)=>s+(x.total_price||0),0);
-      setText('khoTongDonKho', totalOrders); setText('khoTongSPKho', totalOrders);
-      setText('khoTongDonKhoSub', khoRawData.length+' khách • '+fmt(totalMoney)+' tổng');
-      setText('khoTongSPKhoSub', totalOrders+' sản phẩm • Đang Dồn');
-    } else { setText('khoTongDonKho', 0); setText('khoTongSPKho', 0); }
+async function fetchTongHopDon() {
+  const tbody = document.getElementById('khoBody');
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="8" class="text-center py-10 text-slate-400">Đang tải kho từ tonghopdon...</td></tr>';
+  }
+
+  try {
+    // Gọi song song cả 2 API: tonghop_don và chitiet_don
+    const [resDon, resChiTiet] = await Promise.all([
+      fetch('/api/reports/tonghop_don'),
+      fetch('/api/reports/chitiet_don')
+    ]);
+
+    const dataDon = await resDon.json();
+    const chiTietData = await resChiTiet.json() || { total_items: 0, total_value: 0 };
+
+    khoRawData = dataDon || [];
+
+    if (khoRawData.length > 0) {
+      const totalOrders = khoRawData.reduce((s, x) => s + (x.order_count || 0), 0);
+      const totalMoney = khoRawData.reduce((s, x) => s + (x.total_price || 0), 0);
+
+      // 1. Thống kê tổng số đơn
+      setText('khoTongDonKho', totalOrders);
+      setText('khoTongDonKhoSub', khoRawData.length + ' khách • ' + fmt(totalMoney) + ' tổng');
+
+      // 2. Thống kê tổng số lượng sản phẩm
+      setText('khoTongSPKho', typeof fmtNum === 'function' ? fmtNum(chiTietData.total_items) : chiTietData.total_items);
+      setText('khoTongSPKhoSub', 'Từ ' + totalOrders + ' đơn Đang Dồn');
+
+      // 3. Thống kê tổng giá trị sản phẩm
+      setText('khoTongGiaTriKho', fmt(chiTietData.total_value));
+      setText('khoTongGiaTriKhoSub', 'Giá trị ' + (typeof fmtNum === 'function' ? fmtNum(chiTietData.total_items) : chiTietData.total_items) + ' sản phẩm');
+    } else {
+      setText('khoTongDonKho', 0);
+      setText('khoTongDonKhoSub', '0 khách • 0₫ tổng');
+      setText('khoTongSPKho', 0);
+      setText('khoTongSPKhoSub', '0 sản phẩm • Đang Dồn');
+      setText('khoTongGiaTriKho', '0₫');
+      setText('khoTongGiaTriKhoSub', 'Giá trị 0 sản phẩm');
+    }
+
     renderKhoTable();
-  }catch(e){ tbody.innerHTML='<tr><td colspan="8" class="text-center py-10 text-red-400">Lỗi tải kho</td></tr>'; }
+  } catch (e) {
+    console.error(e);
+    if (tbody) {
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center py-10 text-red-400">Lỗi tải kho</td></tr>';
+    }
+  }
 }
+
+// Bắt sự kiện lọc, sắp xếp và tìm kiếm
 document.getElementById('khoFilterType')?.addEventListener('change', renderKhoTable);
 document.getElementById('khoSortType')?.addEventListener('change', renderKhoTable);
 document.getElementById('khoSearch')?.addEventListener('input', renderKhoTable);
@@ -644,4 +734,70 @@ function renderS2aBody(data){
 applyQuickFilter('month');
 </script>
 
+<!-- Modal xem chi tiết đơn hàng từ donhang.html -->
+<div id="orderModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Chi tiết đơn hàng</h2>
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="info-card">
+                <div><span class="info-label">Mã đơn</span><span class="info-value" id="m_order_id">-</span></div>
+                <div><span class="info-label">Số lượng SP</span><span class="info-value" id="m_total_items">-</span></div>
+                <div><span class="info-label">Nickname</span><span class="info-value" id="m_nickname">-</span></div>
+                <div><span class="info-label">ID Tiktok</span><span class="info-value" id="m_username">-</span></div>
+                <div class="price-total"><span class="info-label">Tổng thanh toán</span><span id="m_total_price">0</span> <small>VNĐ</small></div>
+            </div>
+            <table class="detail-list-table">
+                <thead><tr><th align="left">STT</th><th align="right">Giá từng sản phẩm</th></tr></thead>
+                <tbody id="m_order_details"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+  // Giữ nguyên 100% logic điều khiển Modal & Endpoint API từ donhang.html
+  const modal = document.getElementById("orderModal");
+
+  function closeModal() { 
+      if (modal) modal.style.display = "none"; 
+  }
+
+  window.onclick = function(e) { 
+      if (e.target == modal) closeModal(); 
+  }
+
+  function loadDetails(orderId) {
+      if (!modal) return;
+      modal.style.display = "block";
+      
+      // Gọi đúng API endpoint gốc của donhang.html
+      fetch(`/order-details/${encodeURIComponent(orderId)}`)
+          .then(r => r.json())
+          .then(data => {
+              document.getElementById('m_order_id').innerText = data.order_id || orderId;
+              document.getElementById('m_nickname').innerText = data.nickname || '-';
+              document.getElementById('m_username').innerText = data.username || '-';
+              document.getElementById('m_total_items').innerText = data.total_items || 0;
+              
+              const cleanTotal = (data.total_price || "0").toString().replace(/,/g, '');
+              document.getElementById('m_total_price').innerText = Number(cleanTotal).toLocaleString('vi-VN');
+              
+              const tb = document.getElementById('m_order_details'); 
+              tb.innerHTML = '';
+              
+              (data.prices || []).forEach((price, i) => {
+                  const raw = Array.isArray(price) ? price[0] : price;
+                  const cp = (raw || "0").toString().replace(/,/g, '');
+                  tb.innerHTML += `<tr><td style="padding:10px 0; border-bottom:1px solid #f1f5f9;">#${i+1}</td><td align="right" style="font-weight:500;">${Number(cp).toLocaleString('vi-VN')} đ</td></tr>`;
+              });
+          })
+          .catch(err => {
+              console.error(err);
+              alert("Lỗi kết nối dữ liệu đơn hàng!");
+          });
+  }
+</script>
 {% endblock %}
